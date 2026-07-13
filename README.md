@@ -29,7 +29,7 @@ Named cost-explosion classes, each a seed strategy the fuzz engine mutates towar
 
 See [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
 
-## Part of the Agent Reliability toolkit
+## Part of the Swarm Proof toolkit
 
 *Trust infrastructure for the agent economy — seven projects, one thesis.*
 
