@@ -56,7 +56,7 @@ It is a **directed fuzzer whose fitness function is dollars.** Where security fu
 | REQ-CM-1 | Meter MUST compute per-run cost as a **sum over cost sources**: `Σ(input_tokens×in_price + output_tokens×out_price)` per model call **+** `Σ tool_call_price` **+** `Σ sub_agent_spawn_cost`. | v0.1 |
 | REQ-CM-2 | Meter MUST support ⊕ **reasoning/thinking tokens** and ⊕ **cache-read vs cache-write** token classes at their distinct prices (2026 pricing reality). | v0.1 |
 | REQ-CM-3 | Pricing MUST come from a **provider-agnostic price table** (JSON) keyed by model id, with fields `input_cost_per_token`, `output_cost_per_token`, `cache_read_cost_per_token`, `reasoning_cost_per_token`, `tool_prices{}`. Vendored from the LiteLLM/tokencost registry, refreshable, `--price-table` overridable. | v0.1 |
-| REQ-CM-4 | Meter MUST attribute all spend — including **sub-agent/child spans** — to the single triggering input via parent/child trace linkage (stampede trace-format). | v0.1 |
+| REQ-CM-4 | Meter MUST attribute all spend — including **sub-agent/child spans** — to the single triggering input via OTel parent/child span linkage, emitted in stampede's authoritative trace-format: the **OpenTelemetry GenAI semantic-conventions profile** (`gen_ai.*` spans + the `swarmproof.*` cost/attack extension), not a bespoke schema. | v0.1 |
 | REQ-CM-5 | Meter MUST support three attachment modes: (a) **SDK-wrapper** (wrap the provider client, read usage), (b) **usage-field parse** (read provider response usage), (c) ⊕ **proxy** adapter. Default: SDK-wrapper. | v0.1 (a/b), v0.2 (c) |
 | REQ-CM-6 | Meter MUST emit a per-run **cost breakdown** (by source, by model, by tool) into the trace, not just a total. | v0.1 |
 | REQ-CM-7 | Meter MUST provide a **dry-run estimator**: predict a candidate's cost from trace *shape* without a paid run, flagged as estimated. | v0.2 |
@@ -90,10 +90,10 @@ It is a **directed fuzzer whose fitness function is dollars.** Where security fu
 | ID | Requirement | Priority |
 |----|-------------|----------|
 | REQ-RP-1 | Rank worst offenders with: the $ each caused, the **breakdown by source**, the **class** that triggered, and **exact reproduction** (the input + seed + run config). | v0.1 |
-| REQ-RP-2 | Render via the shared **oxblood report-renderer** (HTML + terminal), matching the portfolio look. | v0.1 |
+| REQ-RP-2 | Populate the shared **`RunReport`** model with an economic-findings section and render it via the shared **report-renderer** (oxblood HTML + terminal). costbomb owns no renderer; embedded and standalone paths render from the identical `RunReport`. | v0.1 |
 | REQ-RP-3 | Report MUST show the **amplification factor** ("5¢ baseline → $5.20 worst case = 104×") as the headline number. | v0.1 |
 | REQ-RP-4 | ⊕ Report MUST flag findings where a storming/looping tool has **side-effects** → duplicate-charge risk (exactly-once cross-check). | v0.3 |
-| REQ-RP-5 | ⊕ Report MUST be **exportable** to the shared OTel trace format (for Langfuse import) and a machine-readable `findings.json`. | v0.2 |
+| REQ-RP-5 | ⊕ Report MUST be **exportable** to the shared trace-format (the OTel GenAI profile: `gen_ai.*` + `swarmproof.*`, for Langfuse/OTel-backend import) and a machine-readable `findings.json`. | v0.2 |
 
 ### 4.5 CI gate (`REQ-CI-*`)
 
@@ -137,7 +137,7 @@ It is a **directed fuzzer whose fitness function is dollars.** Where security fu
 | NFR-6 **No heavy deps** | Search loop in pure Python; core has minimal dependencies; store defaults to SQLite/JSON. | Portfolio standard; easy install. |
 | NFR-7 **Fast CI mode** | `--dry-run` smoke completes in < ~10s with no paid calls. | PR gate must be fast. |
 | NFR-8 **Portable meter accuracy** | Metered $ MUST match provider-reported cost within a documented tolerance (target ≤ 1% on token costs given a correct table). | The meter is the oracle; if it lies, the search optimizes a lie. |
-| NFR-9 ⊕ **Trace-format compatibility** | Emit the shared OTel-compatible agent-trace schema so findings interoperate with stampede/Langfuse. | Portfolio interop. |
+| NFR-9 ⊕ **Trace-format compatibility** | Emit the shared, authoritative trace-format — the **OpenTelemetry GenAI semantic-conventions profile** (`gen_ai.*` spans + the `swarmproof.*` extension) — so findings interoperate natively with stampede, Langfuse, and any OTel GenAI backend. No generic or bespoke schema. | Portfolio interop. |
 | NFR-10 **Graceful degradation** | With no LLM available, template attacks + dry-run estimation still run and still gate CI. | mcp-probe-style no-LLM baseline. |
 
 ---
@@ -146,7 +146,7 @@ It is a **directed fuzzer whose fitness function is dollars.** Where security fu
 
 | Tier | Feature | REQ refs | Attack classes |
 |------|---------|----------|----------------|
-| **v0.1 — inside stampede** | Cost meter (tokens+tools+spawns, breakdown, attribution); `AttackClass` interface; 5 SPEC classes as seed strategies (template mutation only); `PersonaTarget`; oxblood report section; own-budget cap; seedable. | CM-1..6, AL-1/3/4(iface), FE-4(template)/6, RP-1/2/3, TA-3/5, NFR-1/2/3/6/9 | retry-loop, tool-storm, context-bomb, recursion, clarification-trap |
+| **v0.1 — inside stampede** | Cost meter (tokens+tools+spawns, breakdown, attribution); `AttackClass` interface; 5 SPEC classes as seed strategies (template mutation only); `PersonaTarget`; shared `RunReport` findings section (report-renderer); own-budget cap; seedable. | CM-1..6, AL-1/3/4(iface), FE-4(template)/6, RP-1/2/3, TA-3/5, NFR-1/2/3/6/9 | retry-loop, tool-storm, context-bomb, recursion, clarification-trap |
 | **v0.2 — standalone extract + CLI + CI gate** | Standalone CLI; full **fuzz search engine** (evolutionary + power schedule + p95 fitness + LLM mutator + stopping criteria + surrogate); `HTTPTarget`/`PythonTarget`/`MockworldTarget`; **CI gate** + baseline + price-separation + dry-run smoke; findings.json/OTel export; dry-run estimator; ⊕ 5 extra attack classes. | CM-5(c)/7, AL-2/5, FE-1/2/3/4(LLM)/5/7, RP-5, CI-1..6, TA-1/2/4, NFR-4/5/7/8/10 | + reasoning-inflation, model-escalation, cache-bust, tool-cost-asymmetry, retrieval-amplification |
 | **v0.3 — policy + ecosystem** | Custom attack authoring (docs+external loading); **spend-ceiling policy** + enforcer-config emit; **exactly-once** duplicate-effect cross-check; **agent-postmortems** incident-as-seed; provider what-if re-pricing. | AL-4(UX)/6, RP-4, SP-1/2, CM-8 | + community/custom classes |
 
@@ -167,7 +167,12 @@ It is a **directed fuzzer whose fitness function is dollars.** Where security fu
 
 ## 8. Dependencies
 
-- **stampede** (shared core home): trace-format, persona-pack (adversarial persona), report-renderer, agent-driver. costbomb v0.1 lives *inside* stampede's repo/cohort; extraction depends on these APIs stabilizing (~stampede v0.2).
+- **stampede** (shared core home) — costbomb consumes these now-authoritative contracts verbatim, does not fork them:
+  - **trace-format** = the OpenTelemetry GenAI semantic-conventions profile (`gen_ai.*` + `swarmproof.*` extension).
+  - **persona-pack** = `apiVersion: swarmproof.dev/persona/v1`; the `adversarial:economic` persona + its attack-library playbook are authored in this schema.
+  - **report-renderer** = the shared `RunReport` model rendered to oxblood HTML + terminal.
+  - **agent-driver** = the shared agent execution/driver used by `PersonaTarget`.
+  costbomb v0.1 lives *inside* stampede's repo/cohort; extraction depends on these APIs stabilizing (~stampede v0.2).
 - **Price data**: LiteLLM `model_prices_and_context_window.json` / tokencost registry (vendored, refreshable).
 - **mockworld**: default safe target for side-effect-bearing attacks (v0.2).
 - **exactly-once**: duplicate-side-effect cross-check (v0.3).

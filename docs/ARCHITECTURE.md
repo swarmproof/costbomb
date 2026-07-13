@@ -95,7 +95,7 @@ Vendored from the LiteLLM / tokencost registry, extended with tool prices. Pinne
 | **proxy** ⊕ | Meter sits as an OpenAI-compatible proxy; all traffic flows through it. | High; language-agnostic. | v0.2, targets we can't wrap. |
 | **wire-estimate** (fallback) | No usage available → tokenize the wire, estimate. | Lower; flagged `estimated`. | Last resort (Assumption A1). |
 
-The meter writes a **per-run breakdown** (by source/model/tool) into the shared trace, and rolls **child spans** up to the parent input (`REQ-CM-4`) using stampede's parent/child trace linkage. This is why costbomb reuses trace-format rather than inventing its own.
+The meter writes a **per-run breakdown** (by source/model/tool) as spans in stampede's now-authoritative **trace-format** — the **OpenTelemetry GenAI semantic-conventions profile** (`gen_ai.*` spans + the `swarmproof.*` extension for cost/attack metadata), *not* a generic or bespoke schema. The `Trace` the meter consumes and emits IS this profile: model calls are `gen_ai.*` spans carrying token usage; costbomb records per-span cost and roll-up under `swarmproof.cost.*`, and rolls **child spans** up to the parent input (`REQ-CM-4`) via OTel parent/child span linkage. This is why costbomb reuses the shared profile rather than inventing its own.
 
 ### 2.4 Dry-run estimator (`REQ-CM-7`, surrogate for `REQ-FE-7`)
 
@@ -104,6 +104,8 @@ A cheap function `estimate(trace_shape) -> $` predicts a candidate's cost from i
 ---
 
 ## 3. Component: Attack library (`REQ-AL-*`)
+
+> **Shared-contract binding:** in the embedded path the attack library is surfaced as the `adversarial:economic` cohort of a stampede **persona-pack** document (`apiVersion: swarmproof.dev/persona/v1`) — the persona's playbook *is* this class catalog. In the standalone path the same classes load via the `AttackClass` registry below. One catalog, two packagings; the persona-pack is the shared, versioned contract.
 
 ### 3.1 The `AttackClass` seed-strategy interface
 
@@ -181,8 +183,8 @@ report(best)
 
 ## 5. Component: Reporter + CI gate (`REQ-RP-*`, `REQ-CI-*`)
 
-### 5.1 Report (oxblood renderer, `REQ-RP-2`)
-Headline: the **amplification factor** ("5¢ → $5.20 = 104×", `REQ-RP-3`). Then a ranked table: rank · class · worst-case $ · breakdown (tokens/tools/spawns) · exact repro (input + seed + config). ⊕ Side-effect flag when a storming tool has effects (exactly-once cross-check, `REQ-RP-4`). Exports `findings.json` + OTel trace (`REQ-RP-5`).
+### 5.1 Report (shared `RunReport` model + report-renderer, `REQ-RP-2`)
+costbomb does **not** own a renderer. It populates stampede's shared **`RunReport`** model (the authoritative report data structure) with an economic-findings section, then renders it through the shared **report-renderer** (the oxblood-styled HTML + terminal engine). Headline: the **amplification factor** ("5¢ → $5.20 = 104×", `REQ-RP-3`). Then a ranked table: rank · class · worst-case $ · breakdown (tokens/tools/spawns) · exact repro (input + seed + config). ⊕ Side-effect flag when a storming tool has effects (exactly-once cross-check, `REQ-RP-4`). Exports `findings.json` + the OTel GenAI-profile trace (`REQ-RP-5`). Because the section is a `RunReport` fragment, the embedded path (Agent Readiness Report) and the standalone path (costbomb report file) render from the identical model.
 
 ### 5.2 CI gate — the north-star surface
 ```
@@ -221,7 +223,7 @@ We re-run the *baseline's inputs* under the *current price table* before compari
                          │  • CostMeter (+ price table)                   │
                          │  • AttackLibrary (AttackClass registry)        │
                          │  • FuzzEngine (search, seedable)               │
-                         │  • Reporter (findings model + oxblood render)  │
+                         │  • Reporter (findings → shared RunReport model) │
                          │  • Target (Protocol: invoke(input)->Trace)     │
                          └───────────────┬───────────────┬───────────────┘
                                          │               │
@@ -243,14 +245,14 @@ We re-run the *baseline's inputs* under the *current price table* before compari
 
 ### 6.1 The contract that makes both work
 The **`Target` Protocol** is the seam. `costbomb-core` only knows `invoke(input, ctx) -> Trace`. 
-- **Embedded (A):** `PersonaTarget` implements `invoke` by driving a stampede agent via stampede's **agent-driver**; spend flows into stampede's **report-renderer** as the cost-profile section. costbomb-core is a *dependency inside stampede's repo* — literally `stampede/adversarial/economic/` importing `costbomb_core`.
+- **Embedded (A):** `PersonaTarget` implements `invoke` by driving a stampede agent via stampede's **agent-driver**; the `adversarial:economic` cohort is defined as a **persona-pack** document (`apiVersion: swarmproof.dev/persona/v1`) and its attack library is that persona's playbook; spend is emitted as OTel GenAI-profile spans and populates the shared **`RunReport`** model's cost-profile section. costbomb-core is a *dependency inside stampede's repo* — literally `stampede/adversarial/economic/` importing `costbomb_core`.
 - **Standalone (B):** `HTTPTarget`/`PythonTarget`/`MockworldTarget` implement the same `invoke`. The CLI is a thin wrapper: parse args → build a Target → call `FuzzEngine.run()` → render report → set exit code.
 
 ### 6.2 What lives where (no duplication)
 | Concern | Location | Rationale |
 |---------|----------|-----------|
 | Meter, attacks, engine, findings model | `costbomb-core` | The IP; identical in both launches. |
-| trace-format, persona-pack, report-renderer, agent-driver | **stampede** (shared primitive, vendored) | Portfolio rule: build in first consumer, extract at stampede v0.2. costbomb *consumes*, doesn't own. |
+| trace-format (**OTel GenAI profile: `gen_ai.*` + `swarmproof.*`**), persona-pack (**`swarmproof.dev/persona/v1`**), report-renderer (**`RunReport` model**), agent-driver | **stampede** (shared, now-authoritative contracts; vendored) | Portfolio rule: build in first consumer, extract at stampede v0.2. costbomb *consumes* these exact contracts, doesn't own or fork them. |
 | `PersonaTarget` | stampede side (imports core) | Only the embedded path needs it. |
 | `HTTP/Python/Mockworld` targets, CLI, CI gate, baseline files | standalone `costbomb` repo | Only the standalone path needs these. |
 
@@ -271,7 +273,7 @@ The **`Target` Protocol** is the seam. `costbomb-core` only knows `invoke(input,
 
 ## 8. Tech stack
 
-Python 3.11+; pure-Python search loop (no heavy deps, NFR-6); provider layer = Anthropic SDK + OpenAI-compatible + Ollama (NFR-3); price table vendored from LiteLLM/tokencost JSON; trace store SQLite/JSON; report via shared oxblood renderer; findings export as `findings.json` + OTel. LLM mutator defaults to Ollama/cheap model or off (NFR-4).
+Python 3.11+; pure-Python search loop (no heavy deps, NFR-6); provider layer = Anthropic SDK + OpenAI-compatible + Ollama (NFR-3); price table vendored from LiteLLM/tokencost JSON; trace store SQLite/JSON, spans in the shared OTel GenAI profile (`gen_ai.*` + `swarmproof.*`); report via the shared `RunReport` model + report-renderer; findings export as `findings.json` + OTel-profile trace. LLM mutator defaults to Ollama/cheap model or off (NFR-4).
 
 ---
 
@@ -281,7 +283,7 @@ Python 3.11+; pure-Python search loop (no heavy deps, NFR-6); provider layer = A
 *Context:* targets are non-deterministic. *Decision:* every candidate is run `k` times; fitness is the p95. *Consequence:* stable findings and a non-flaky CI gate at the cost of `k`× spend per candidate — mitigated by surrogate pre-ranking so only top-K get the full `k` runs.
 
 **ADR-2 — Cost meter is a sum over sources, not tokens×price.**
-*Context:* SPEC's token-only formula misses tool-storm and recursion. *Decision:* meter = model tokens + tool fees + recursive sub-agent rollup. *Consequence:* price table needs tool prices; trace needs parent/child spans (reuse stampede's). This is what makes 3 of the 5 attack classes measurable at all.
+*Context:* SPEC's token-only formula misses tool-storm and recursion. *Decision:* meter = model tokens + tool fees + recursive sub-agent rollup. *Consequence:* price table needs tool prices; trace needs parent/child spans — reuse stampede's OTel GenAI profile (`gen_ai.*` spans + `swarmproof.cost.*` extension), not a bespoke schema. This is what makes 3 of the 5 attack classes measurable at all.
 
 **ADR-3 — `Target` Protocol is the embedded/standalone seam.**
 *Context:* two launches, one codebase. *Decision:* core depends only on `invoke(input)->Trace`; entrypoints supply the Target. *Consequence:* extraction from stampede is a packaging change, not a rewrite; both launches provably share one engine.
