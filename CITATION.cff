@@ -5,8 +5,8 @@ abstract: "Denial-of-wallet fuzzing for agent systems. Part of the Agent Reliabi
 authors:
   - family-names: Boudoukha
     given-names: Maroua
-repository-code: "https://github.com/AgentReliability/costbomb"
-url: "https://github.com/AgentReliability/costbomb"
+repository-code: "https://github.com/swarmproof/costbomb"
+url: "https://github.com/swarmproof/costbomb"
 license: Apache-2.0
 type: software
 keywords:

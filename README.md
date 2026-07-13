@@ -7,7 +7,7 @@
 <!-- TODO: demo GIF — a benign input running an agent's bill from 5¢ to $5, then costbomb finding it -->
 <p align="center"><em>▶ demo GIF coming — costbomb automatically finding the input that runs the bill from 5¢ to $5</em></p>
 
-> **Status:** 🚧 Ships first *inside* [stampede](https://github.com/AgentReliability/stampede)'s adversarial cohort, then extracts here as a standalone CLI.
+> **Status:** 🚧 Ships first *inside* [stampede](https://github.com/swarmproof/stampede)'s adversarial cohort, then extracts here as a standalone CLI.
 
 ---
 
@@ -35,13 +35,13 @@ See [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
 
 | Project | What it does |
 |---------|--------------|
-| [stampede](https://github.com/AgentReliability/stampede) | Point a herd of realistic agents at your system before real ones arrive |
-| [mockworld](https://github.com/AgentReliability/mockworld) | A synthetic internet for agents — fake Stripe, Gmail, exchange, instantly |
-| [mcp-probe](https://github.com/AgentReliability/mcp-probe) | The CI quality suite for MCP servers — lint, contract-test, benchmark, load |
+| [stampede](https://github.com/swarmproof/stampede) | Point a herd of realistic agents at your system before real ones arrive |
+| [mockworld](https://github.com/swarmproof/mockworld) | A synthetic internet for agents — fake Stripe, Gmail, exchange, instantly |
+| [mcp-probe](https://github.com/swarmproof/mcp-probe) | The CI quality suite for MCP servers — lint, contract-test, benchmark, load |
 | **costbomb** ← *you are here* | Denial-of-wallet fuzzing — find the inputs that make your agent spend $500 |
-| [exactly-once](https://github.com/AgentReliability/exactly-once) | Idempotency middleware so agent side-effects fire once |
-| [agent-postmortems](https://github.com/AgentReliability/agent-postmortems) | A structured incident database + post-mortem standard for agent failures |
-| [awesome-agent-reliability](https://github.com/AgentReliability/awesome-agent-reliability) | The curated map of the field |
+| [exactly-once](https://github.com/swarmproof/exactly-once) | Idempotency middleware so agent side-effects fire once |
+| [agent-postmortems](https://github.com/swarmproof/agent-postmortems) | A structured incident database + post-mortem standard for agent failures |
+| [awesome-agent-reliability](https://github.com/swarmproof/awesome-agent-reliability) | The curated map of the field |
 
 ## License
 
