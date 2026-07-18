@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from costbomb._vendor.run_report import merge_economic_section
+from costbomb._vendor.trace import Trace
 from costbomb.meter import CostBreakdown
 
 
@@ -27,6 +28,8 @@ def amplification(baseline_usd: float, worst_usd: float) -> float:
 class Finding(BaseModel):
     """One class's worst offender, with exact reproduction (REQ-RP-1)."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     rank: int
     attack_class: str
     worst_usd: float
@@ -39,6 +42,9 @@ class Finding(BaseModel):
     under_sampled: bool = False  # fewer than k runs completed (cap hit mid-k), SA-4
     side_effect_risk: bool = False  # ⊕ storming/looping tool with side-effects (REQ-RP-4)
     repro: dict[str, Any] = Field(default_factory=dict)
+    # In-memory only: the metered worst-case trace, for OTel export (REQ-RP-5) and
+    # for the CI gate to re-price under a new table (REQ-CI-3). Excluded from JSON.
+    worst_trace: Trace | None = Field(default=None, exclude=True, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {

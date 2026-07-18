@@ -147,6 +147,38 @@ class Span:
     def duration_ticks(self) -> int:
         return max(0, self.end_tick - self.start_tick)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serializable form (baseline storage + OTel export, REQ-RP-5)."""
+        return {
+            "name": self.name,
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
+            "kind": self.kind.value,
+            "service_name": self.service_name,
+            "start_tick": self.start_tick,
+            "end_tick": self.end_tick,
+            "attributes": dict(sorted(self.attributes.items())),
+            "status": self.status,
+            "status_message": self.status_message,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Span:
+        return cls(
+            name=d["name"],
+            trace_id=d["trace_id"],
+            span_id=d["span_id"],
+            parent_span_id=d.get("parent_span_id"),
+            kind=SpanKind(d.get("kind", "INTERNAL")),
+            service_name=d.get("service_name", "costbomb"),
+            start_tick=d.get("start_tick", 0),
+            end_tick=d.get("end_tick", 0),
+            attributes=dict(d.get("attributes", {})),
+            status=d.get("status", "OK"),
+            status_message=d.get("status_message", ""),
+        )
+
 
 @dataclass
 class Trace:
@@ -172,3 +204,18 @@ class Trace:
 
     def by_operation(self, operation: str) -> list[Span]:
         return [s for s in self.spans if s.get(GenAI.OPERATION_NAME) == operation]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "root_span_id": self.root_span_id,
+            "estimated": self.estimated,
+            "spans": [s.to_dict() for s in self.spans],
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Trace:
+        return cls(
+            root_span_id=d["root_span_id"],
+            estimated=d.get("estimated", False),
+            spans=[Span.from_dict(s) for s in d.get("spans", [])],
+        )

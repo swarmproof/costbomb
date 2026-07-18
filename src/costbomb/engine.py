@@ -23,6 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from random import Random
 
+from costbomb._vendor.trace import Trace
 from costbomb.attacks.base import AttackRegistry, Input, TargetCapabilities
 from costbomb.attacks.base import registry as default_registry
 from costbomb.estimator import Estimator
@@ -43,6 +44,7 @@ class SearchConfig:
     wall_clock_s: float | None = None
     top_k_ratio: float = 0.5  # surrogate: pay only for est in the top fraction
     min_history_before_prune: int = 8
+    cap_safety: float = 1.25  # headroom on the cap reservation so it holds strictly (NFR-1)
     classes: tuple[str, ...] | None = None  # None → all applicable
     use_llm: bool = False
     dry_run: bool = False  # estimate only, zero paid calls (REQ-CI-4, NFR-7)
@@ -66,6 +68,7 @@ class _EvalResult:
     used_usd: float
     hit_cap: bool
     estimated: bool
+    worst_trace: Trace | None = None
 
     @property
     def under_sampled(self) -> bool:
@@ -112,6 +115,7 @@ class FuzzEngine:
 
         self._rng = Random(self.config.seed)
         self._own_spend = 0.0
+        self._max_run_cost = 0.0  # largest single real run seen — the cap reservation
         self._est_history: list[float] = []
 
     # ---- public API ----
@@ -235,12 +239,18 @@ class FuzzEngine:
 
         samples: list[float] = []
         worst_bd = CostBreakdown()
+        worst_trace: Trace | None = None
         used = 0.0
-        per_run_est = max(self.estimator.estimate_input(input), 1e-6)
+        # Reserve the larger of the candidate's estimate and the worst real run seen,
+        # so the guard is backed by an observed upper bound — a predictor that
+        # under-estimates must never be able to breach the cap (NFR-1, E2E-4).
+        reservation = max(self.estimator.estimate_input(input), self._max_run_cost, 1e-6) * cfg.cap_safety
         for i in range(k):
             # Cap guard: never *start* a run we cannot afford (SA-4, E2E-4).
-            if self._own_spend + used + per_run_est > cfg.max_spend_usd:
-                return _EvalResult(samples, worst_bd, used, hit_cap=True, estimated=False)
+            if self._own_spend + used + reservation > cfg.max_spend_usd:
+                return _EvalResult(
+                    samples, worst_bd, used, hit_cap=True, estimated=False, worst_trace=worst_trace
+                )
             ctx = TargetContext(
                 seed=cfg.seed,
                 run_index=i,
@@ -251,9 +261,14 @@ class FuzzEngine:
             bd = self.meter.cost(trace)
             samples.append(bd.total_usd)
             used += bd.total_usd
+            self._max_run_cost = max(self._max_run_cost, bd.total_usd)
             if bd.total_usd >= worst_bd.total_usd:
                 worst_bd = bd
-        return _EvalResult(samples, worst_bd, used, hit_cap=False, estimated=worst_bd.estimated)
+                worst_trace = trace
+        return _EvalResult(
+            samples, worst_bd, used, hit_cap=False, estimated=worst_bd.estimated,
+            worst_trace=worst_trace,
+        )
 
     def _consider(
         self, best: dict[str, tuple[Input, _EvalResult]], input: Input, res: _EvalResult
@@ -303,6 +318,7 @@ class FuzzEngine:
                     estimated=res.estimated,
                     under_sampled=res.under_sampled,
                     side_effect_risk=side_effect_risk,
+                    worst_trace=res.worst_trace,
                     repro={
                         "input": input.text,
                         "input_id": input.id,
