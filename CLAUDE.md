@@ -2,17 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: design-phase, docs-only
+## Status: `costbomb-core` implemented (v0.2 standalone extract)
 
-There is **no source code yet** — no `pyproject.toml`, package, or tests. The repo is a
-complete spec chain that any implementation must be traceable to. Do not invent build/lint/test
-commands; they will exist once code lands. When you start implementing, honor the intended stack
-below and wire the toolchain to match the spec (Python 3.11+, minimal deps).
+The package is real and runnable. `costbomb-core` (meter, attacks, engine, targets, reporter,
+CI gate) is the stampede-independent IP; the standalone CLI + CI gate wrap it. The embedded path
+(`PersonaTarget` driving a real stampede agent) lives on the stampede side — here `PersonaTarget`
+is a thin bridge that accepts an injected driver, so the seam is testable without stampede.
 
-**Intended stack (from the spec, not yet scaffolded):** Python 3.11+ · pure-Python search loop,
-no heavy deps · provider layer = Anthropic SDK + OpenAI-compatible + Ollama · price table vendored
-from LiteLLM/tokencost JSON · trace store SQLite/JSON. Package installs as `pip install costbomb`;
-north-star CLI surface is `costbomb run --target <t> --budget <usd> --fail-on-regression`.
+**Stack:** Python 3.11+ · `src/` layout · hatchling · `typer` CLI · pydantic v2 · `rich` reports ·
+pure-Python search loop, minimal deps. Providers/http/otel are optional extras. Matches stampede's
+conventions (ruff@100, mypy+pydantic plugin, pytest).
+
+### Commands
+
+```bash
+pip install -e ".[dev]"                                     # dev install
+pytest -q                                                   # 42 tests (unit → integration → e2e)
+pytest tests/test_meter.py -q                               # one file
+pytest -k price_drift                                       # one test by keyword
+ruff check src tests examples                               # lint (must be clean)
+mypy                                                        # type-check (needs src/costbomb/py.typed)
+costbomb run --target examples/demo_agent.py:handler        # the 5¢→$5 demo (seed 1337 → ~211×)
+costbomb run --target ./agent.py:handler --fail-on-regression   # the north-star CI gate
+costbomb run --target fake --dry-run                        # zero-paid-call smoke
+```
+
+### Package map (`src/costbomb/`)
+
+`pricing.py` + `meter.py` (the oracle) · `attacks/` (`base.py` interface + registry, `v01.py` 5
+classes) · `targets/` (`base.py` seam + `fake`/`python`/`http`/`persona`) · `estimator.py` ·
+`engine.py` (search) · `findings.py` · `report.py` · `ci.py` (gate+baseline) · `export.py` ·
+`cli.py` · `_vendor/` (vendored stampede contracts) · `data/prices.json`. Tests in `tests/`
+map to TEST-PLAN IDs (e.g. `test_it_2_own_budget_cap_never_exceeded`).
+
+**Tests use `FakeTarget` and scripted traces — no real dollars, no network.** The one number a
+`Finding` cannot serialize is `worst_trace` (excluded from JSON; kept in memory for the gate's
+re-pricing and OTel export).
 
 ## What costbomb is
 
