@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-from costbomb._vendor.trace import Trace
+from costbomb._vendor.trace import Span, Trace
 from costbomb.attacks.base import Input, TargetCapabilities
 from costbomb.tracebuild import TraceBuilder
 
@@ -80,7 +80,7 @@ class RunRecord:
         self._emit(tb, root)
         return tb.build(estimated=estimated)
 
-    def _emit(self, tb: TraceBuilder, parent) -> None:  # type: ignore[no-untyped-def]
+    def _emit(self, tb: TraceBuilder, parent: Span) -> None:
         for call in self.calls:
             tb.chat(
                 parent,

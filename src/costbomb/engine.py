@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from random import Random
 
 from costbomb._vendor.trace import Trace
-from costbomb.attacks.base import AttackRegistry, Input, TargetCapabilities
+from costbomb.attacks.base import AttackRegistry, Input, Mutator, TargetCapabilities
 from costbomb.attacks.base import registry as default_registry
 from costbomb.estimator import Estimator
 from costbomb.findings import Finding, RunFindings, amplification
@@ -99,7 +99,7 @@ class FuzzEngine:
         registry: AttackRegistry | None = None,
         meter: CostMeter | None = None,
         estimator: Estimator | None = None,
-        mutator: object | None = None,
+        mutator: Mutator | None = None,
         now: Callable[[], float] | None = None,
         run_id: str = "costbomb-run",
     ) -> None:
@@ -211,7 +211,7 @@ class FuzzEngine:
 
     # ---- internals ----
 
-    def _select_classes(self, caps: TargetCapabilities):  # type: ignore[no-untyped-def]
+    def _select_classes(self, caps: TargetCapabilities) -> list:
         applicable = self.registry.applicable(caps)
         if self.config.classes is None:
             return applicable
