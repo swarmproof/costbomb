@@ -16,8 +16,9 @@ jobs a class does in the search loop:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from random import Random
 from typing import Protocol, runtime_checkable
 
@@ -126,10 +127,9 @@ class BaseAttack:
     def _apply(self, parent: Input, text: str, rng: Random, llm: Mutator | None, hint: str) -> Input:
         """Return a child input, using the LLM mutator when supplied else template."""
         if llm is not None:
-            try:
+            # LLM failures fall back to the template text already computed (NFR-10).
+            with contextlib.suppress(Exception):
                 text = llm.rewrite(parent.text, hint)
-            except Exception:  # noqa: BLE001 - LLM failures fall back to template (NFR-10)
-                pass
         return parent.child(text)
 
 

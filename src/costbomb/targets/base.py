@@ -72,7 +72,7 @@ class RunRecord:
 
     calls: list[ModelCall] = field(default_factory=list)
     tool_calls: list[str] = field(default_factory=list)
-    spawns: list["RunRecord"] = field(default_factory=list)
+    spawns: list[RunRecord] = field(default_factory=list)
 
     def to_trace(self, *, seed: int, attack_class: str = "", estimated: bool = False) -> Trace:
         tb = TraceBuilder(seed, attack_class=attack_class)

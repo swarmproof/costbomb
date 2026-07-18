@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from random import Random
 
+from costbomb._vendor.trace import Trace
 from costbomb.attacks.base import (
     BaseAttack,
     Input,
@@ -22,7 +23,6 @@ from costbomb.attacks.base import (
     registry,
     total_input_tokens,
 )
-from costbomb._vendor.trace import Trace
 
 
 class RetryLoop(BaseAttack):
