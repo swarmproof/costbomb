@@ -18,7 +18,7 @@ two by driving a stampede agent and metering the run.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from costbomb._vendor.trace import Span, Trace
 from costbomb.attacks.base import Input, TargetCapabilities
@@ -33,7 +33,7 @@ class TargetContext:
     run_index: int = 0  # which of the k repeated runs (fitness is p95 over k)
     attack_class: str = ""
     allow_side_effects: bool = False  # NFR-5: real side-effects require opt-in
-    extra: dict[str, str] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable

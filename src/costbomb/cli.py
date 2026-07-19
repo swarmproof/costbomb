@@ -36,6 +36,11 @@ def _build_target(spec: str) -> Target:
         from costbomb.targets.fake import FakeTarget
 
         return FakeTarget()
+    if spec.startswith("mock:"):
+        # `mock:<handler-spec>` — the safe default; effects hit mockworld fakes (NFR-5).
+        from costbomb.targets.mockworld_target import MockworldTarget
+
+        return MockworldTarget(spec[len("mock:"):])
     if spec.startswith(("http://", "https://")):
         from costbomb.targets.http_target import HTTPTarget
 

@@ -11,6 +11,7 @@ from costbomb.targets.base import (
 )
 from costbomb.targets.fake import FakeTarget
 from costbomb.targets.http_target import HTTPTarget
+from costbomb.targets.mockworld_target import MockworldTarget
 from costbomb.targets.persona_target import PersonaTarget
 from costbomb.targets.python_target import PythonTarget
 
@@ -18,6 +19,7 @@ __all__ = [
     "FakeTarget",
     "HTTPTarget",
     "ModelCall",
+    "MockworldTarget",
     "PersonaTarget",
     "PythonTarget",
     "RunRecord",
