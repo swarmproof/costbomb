@@ -116,6 +116,7 @@ class FuzzEngine:
         self._rng = Random(self.config.seed)
         self._own_spend = 0.0
         self._max_run_cost = 0.0  # largest single real run seen — the cap reservation
+        self._max_mutation_cost = 0.0  # largest LLM-mutation cost seen (SA-3 reservation)
         self._est_history: list[float] = []
 
     # ---- public API ----
@@ -183,8 +184,23 @@ class FuzzEngine:
                 break
             parent = self._select(queue)
             cls = self.registry.get(parent.class_name)
+            # Reserve the LLM mutator's own spend against the cap *before* mutating, so
+            # its cost can never breach the budget (SA-3) — same discipline as runs.
+            mut_reserve = self._max_mutation_cost * cfg.cap_safety
+            if (
+                cfg.use_llm
+                and self.mutator is not None
+                and self._own_spend + mut_reserve > cfg.max_spend_usd
+            ):
+                result.stopped_reason = "budget-capped"
+                break
             child = cls.mutate(parent.input, self._rng, self.mutator if cfg.use_llm else None)
-            self._own_spend += float(getattr(self.mutator, "last_cost_usd", 0.0) or 0.0)
+            mcost = float(getattr(self.mutator, "last_cost_usd", 0.0) or 0.0)
+            self._own_spend += mcost
+            self._max_mutation_cost = max(self._max_mutation_cost, mcost)
+            if self._own_spend >= cfg.max_spend_usd:
+                result.stopped_reason = "budget-capped"
+                break
 
             est = self.estimator.estimate_input(child)
             self._est_history.append(est)
