@@ -18,9 +18,11 @@ from costbomb.attacks.base import (
     TargetCapabilities,
     registry,
 )
-from costbomb.attacks.v01 import register_all
+from costbomb.attacks.v01 import register_all as _register_v01
+from costbomb.attacks.v02 import register_all as _register_v02
 
-register_all()
+_register_v01()
+_register_v02()
 
 __all__ = [
     "AttackClass",

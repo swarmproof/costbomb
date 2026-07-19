@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Protocol, runtime_checkable
 
-from costbomb._vendor.trace import GenAI, Trace
+from costbomb._vendor.trace import GenAI, Swarmproof, Trace
 
 
 @dataclass(frozen=True)
@@ -73,6 +73,11 @@ class TargetCapabilities:
     can_spawn: bool = False
     supports_reasoning: bool = False
     accepts_documents: bool = True
+    # ⊕ v0.2 preconditions — a class whose precondition is unmet is skipped and the
+    # report says so (REQ-AL-5), so new classes never produce meaningless findings.
+    uses_cache: bool = False  # prompt caching in play → cache-bust applies
+    is_routed: bool = False  # a model router chooses the model → model-escalation applies
+    has_retrieval: bool = False  # RAG/retrieval tool present → retrieval-amplification applies
 
 
 @runtime_checkable
@@ -191,5 +196,20 @@ def count_spawns(trace: Trace) -> int:
 
 
 def total_input_tokens(trace: Trace) -> int:
-    """Summed input tokens across turns (context-bomb signal)."""
+    """Summed input tokens across turns (context-bomb / retrieval-amplification signal)."""
     return sum(int(s.get(GenAI.USAGE_INPUT_TOKENS, 0) or 0) for s in trace.spans)
+
+
+def total_reasoning_tokens(trace: Trace) -> int:
+    """Summed reasoning/thinking tokens (reasoning-inflation signal)."""
+    return sum(int(s.get(Swarmproof.USAGE_REASONING_TOKENS, 0) or 0) for s in trace.spans)
+
+
+def total_cache_write_tokens(trace: Trace) -> int:
+    """Summed cache-write (miss) tokens (cache-bust signal)."""
+    return sum(int(s.get(Swarmproof.USAGE_CACHE_WRITE_TOKENS, 0) or 0) for s in trace.spans)
+
+
+def total_output_tokens(trace: Trace) -> int:
+    """Summed output tokens (model-escalation proxy signal)."""
+    return sum(int(s.get(GenAI.USAGE_OUTPUT_TOKENS, 0) or 0) for s in trace.spans)

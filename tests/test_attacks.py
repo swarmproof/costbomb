@@ -42,10 +42,38 @@ def test_ut_al_3_applicable_gates_by_capability() -> None:
     assert "recursion" in skipped and "tool-storm" in skipped
 
 
-def test_registry_has_the_five_v01_classes() -> None:
-    assert set(registry.names()) == {
-        "clarification-trap", "context-bomb", "recursion", "retry-loop", "tool-storm",
-    }
+V01 = {"clarification-trap", "context-bomb", "recursion", "retry-loop", "tool-storm"}
+V02 = {"reasoning-inflation", "model-escalation", "cache-bust", "tool-cost-asymmetry",
+       "retrieval-amplification"}
+
+
+def test_registry_has_v01_and_v02_classes() -> None:
+    assert set(registry.names()) == V01 | V02
+
+
+def test_v02_applicability_gated_by_new_capabilities() -> None:
+    bare = TargetCapabilities(has_tools=True, priced_tool_names=(), supports_reasoning=False,
+                              uses_cache=False, is_routed=False, has_retrieval=False)
+    # none of the v0.2 preconditions met → all five skipped (honest coverage)
+    assert set(registry.skipped(bare)) >= V02
+
+    rich = TargetCapabilities(has_tools=True, priced_tool_names=("premium_api",),
+                              supports_reasoning=True, uses_cache=True, is_routed=True,
+                              has_retrieval=True)
+    applicable = {a.name for a in registry.applicable(rich)}
+    assert applicable >= V02
+
+
+def test_v02_classes_climb_on_fake_target(prices) -> None:
+    from costbomb.engine import FuzzEngine, SearchConfig
+    from costbomb.targets.fake import FakeTarget
+
+    for name in sorted(V02):
+        cfg = SearchConfig(seed=7, classes=(name,), max_spend_usd=1.0, k=2)
+        rf = FuzzEngine(FakeTarget(), prices=prices, config=cfg).run()
+        assert rf.findings, f"{name}: no findings"
+        assert rf.findings[0].attack_class == name
+        assert rf.worst_usd > rf.baseline_usd, f"{name} did not climb above baseline"
 
 
 def test_input_id_is_stable_content_hash() -> None:

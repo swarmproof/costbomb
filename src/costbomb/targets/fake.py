@@ -17,11 +17,17 @@ from costbomb.targets.base import TargetContext
 from costbomb.tracebuild import TraceBuilder
 
 # Lever vocabularies — each mutation appends words from one of these, so occurrence
-# counts grow with generation and the modelled cost climbs monotonically.
+# counts grow with generation and the modelled cost climbs monotonically. The first
+# block feeds the v0.1 classes; the second the ⊕ v0.2 classes.
 _RETRY = ("retry", "until", "start over", "re-verify", "again", "never give up", "discard")
 _TOOL = ("cross-check", "every", "exhaustive", "verify", "triangulate", "source", "independent")
 _SPAWN = ("sub-agent", "spawn", "recursively", "delegate", "decompose", "specialist")
 _CLARIFY = ("clarify", "confirm", "assumption", "ask me", "not sure")
+_REASON = ("think", "step by step", "reason", "exhaustively", "intermediate", "counterargument")
+_CACHE = ("nonce", "timestamp", "vary", "prefix", "never repeat", "unique", "random tag")
+_RETRIEVE = ("retrieve", "chunk", "top 500", "read all", "recursively retrieve")
+_PREMIUM = ("premium", "paid", "expensive tool")
+_ESCALATE = ("hard", "difficult", "phd", "subtle", "most capable", "high-stakes")
 
 
 def _count(text: str, words: tuple[str, ...]) -> int:
@@ -58,13 +64,18 @@ class FakeTarget:
         self.cap_hits = cap_hits
 
     def capabilities(self) -> TargetCapabilities:
+        # A maximally-exposed target so every class (v0.1 + ⊕ v0.2) is applicable —
+        # useful for tests and demos. Real targets declare a narrower surface.
         return TargetCapabilities(
             has_tools=True,
-            tool_names=(self.priced_tool, "web_search"),
+            tool_names=(self.priced_tool, "web_search", "retrieval"),
             priced_tool_names=(self.priced_tool,),
             can_spawn=True,
-            supports_reasoning=False,
+            supports_reasoning=True,
             accepts_documents=True,
+            uses_cache=True,
+            is_routed=True,
+            has_retrieval=True,
         )
 
     def invoke(self, input: Input, ctx: TargetContext) -> Trace:
@@ -74,13 +85,20 @@ class FakeTarget:
         tool = min(cap, _count(text, _TOOL))
         spawn = min(cap, _count(text, _SPAWN))
         clarify = min(cap, _count(text, _CLARIFY))
+        reason = min(cap, _count(text, _REASON))
+        cache = min(cap, _count(text, _CACHE))
+        retrieve = min(cap, _count(text, _RETRIEVE))
+        premium = min(cap, _count(text, _PREMIUM))
+        escalate = min(cap, _count(text, _ESCALATE))
 
         # Small, deterministic per-run jitter so p95-over-k is meaningful (ADR-1)
         # yet identical for a given (seed, run_index) (NFR-2).
         rng = Random(ctx.seed ^ (ctx.run_index * 2654435761))
         jitter = 1.0 + rng.uniform(-0.05, 0.05)
 
-        context = self.base_input_tokens + _est_tokens(text)
+        # retrieval balloons the retained context; escalation makes replies verbose.
+        context = self.base_input_tokens + _est_tokens(text) + retrieve * 2000
+        out_tok = self.base_output_tokens * (1 + escalate)
         turns = 1 + retry + clarify
 
         tb = TraceBuilder(ctx.seed, attack_class=input.attack_class)
@@ -88,6 +106,8 @@ class FakeTarget:
 
         # Each turn re-reads the accumulated context (retry/clarify loops re-send it,
         # context-bomb grows it) — this is where turns × context becomes real money.
+        # Reasoning tokens (reasoning-inflation) and cache-write/miss tokens
+        # (cache-bust) ride along per turn when their levers are present.
         for i in range(turns):
             in_tok = int(context * (i + 1) * jitter)
             tb.chat(
@@ -95,10 +115,12 @@ class FakeTarget:
                 model=self.model,
                 provider=self.provider,
                 input_tokens=in_tok,
-                output_tokens=self.base_output_tokens,
+                output_tokens=out_tok,
+                reasoning_tokens=int(context * reason * jitter),
+                cache_write_tokens=int((context // 2) * cache * jitter),
             )
 
-        for _ in range(tool):
+        for _ in range(tool + premium):
             tb.tool(root, tool_name=self.priced_tool)
 
         for _ in range(spawn):
