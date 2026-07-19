@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "version": "2026-07-13",
+    "source": "litellm+costbomb-ext",
+    "note": "Vendored from the LiteLLM / tokencost registry and extended with reasoning/cache token classes and tool-call fees (REQ-CM-2/3). Prices are USD per token unless noted. Refresh via `costbomb price refresh`; override with --price-table."
+  },
+  "models": {
+    "anthropic:claude-opus-4-8": {
+      "input_cost_per_token": 3.0e-06,
+      "output_cost_per_token": 1.5e-05,
+      "reasoning_cost_per_token": 1.5e-05,
+      "cache_read_cost_per_token": 3.0e-07,
+      "cache_write_cost_per_token": 3.75e-06
+    },
+    "anthropic:claude-sonnet-5": {
+      "input_cost_per_token": 3.0e-06,
+      "output_cost_per_token": 1.5e-05,
+      "reasoning_cost_per_token": 1.5e-05,
+      "cache_read_cost_per_token": 3.0e-07,
+      "cache_write_cost_per_token": 3.75e-06
+    },
+    "anthropic:claude-haiku-4-5": {
+      "input_cost_per_token": 8.0e-07,
+      "output_cost_per_token": 4.0e-06,
+      "reasoning_cost_per_token": 4.0e-06,
+      "cache_read_cost_per_token": 8.0e-08,
+      "cache_write_cost_per_token": 1.0e-06
+    },
+    "openai:gpt-4o": {
+      "input_cost_per_token": 2.5e-06,
+      "output_cost_per_token": 1.0e-05
+    },
+    "openai:gpt-4o-mini": {
+      "input_cost_per_token": 1.5e-07,
+      "output_cost_per_token": 6.0e-07
+    },
+    "ollama:llama3": {
+      "input_cost_per_token": 0.0,
+      "output_cost_per_token": 0.0
+    }
+  },
+  "tools": {
+    "web_search": { "price_per_call": 0.005 },
+    "code_exec": { "price_per_call": 0.0 },
+    "premium_api": { "price_per_call": 0.02 },
+    "retrieval": { "price_per_call": 0.001 }
+  }
+}

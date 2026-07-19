@@ -7,7 +7,7 @@
 <!-- TODO: demo GIF — a benign input running an agent's bill from 5¢ to $5, then costbomb finding it -->
 <p align="center"><em>▶ demo GIF coming — costbomb automatically finding the input that runs the bill from 5¢ to $5</em></p>
 
-> **Status:** 🚧 Ships first *inside* [stampede](https://github.com/swarmproof/stampede)'s adversarial cohort, then extracts here as a standalone CLI.
+> **Status:** 🚧 `v0.2` in progress. `costbomb-core` is implemented and runnable standalone (below). It ships first *inside* [stampede](https://github.com/swarmproof/stampede)'s `adversarial:economic` cohort (the embedded path), and this repo is the standalone extract. See [Two launches, one codebase](#two-launches-one-codebase).
 
 ---
 
@@ -15,19 +15,94 @@
 
 Agent systems have a failure mode traditional software doesn't: **they can be made to spend unbounded money.** A crafted input sends an agent into a retry loop, a runaway tool-call chain, a context-window explosion, or a recursive sub-agent spawn — each burning tokens and dollars. This "denial-of-wallet" class is real, under-tooled, and terrifying for anyone running agents in production with a company card attached. Security fuzzers hunt crashes; **costbomb hunts spend.**
 
+The failure is invisible to every other quality gate: an agent under a denial-of-wallet attack **succeeds** — no exception, no failed assertion, no red test. It just charged you $500. The oracle everyone else uses is the wrong oracle. **costbomb's oracle is the invoice.**
+
 ## Quickstart
 
 ```bash
-pip install costbomb
-costbomb run --target http://localhost:9000/agent --budget 0.50
-costbomb run --target ./agent.py --fail-on-regression   # CI gate on worst-case cost
+# v0.2 — from source (not yet on PyPI):
+git clone https://github.com/swarmproof/costbomb && cd costbomb
+python -m venv .venv && .venv/bin/pip install -e .
+
+# Crack the bundled 5¢→$5 demo agent automatically, under a $2 self-cap:
+costbomb run --target examples/demo_agent.py:handler
 ```
+
+```
+╭───────────────────── costbomb · denial-of-wallet ─────────────────────╮
+│ 0.10¢ → $0.21 = 211× amplification                                    │
+╰────────────── seed 1337 · own spend $1.83 · budget-capped ────────────╯
+ #  class              worst $   ×    breakdown (model / tool / spawn)   flags
+ 1  retry-loop          $0.21   211×  $0.19 / $0.02 / 0.00¢              side-effect
+ 2  tool-storm          $0.08    …    …
+ …
+ skipped (target can't exhibit): recursion
+```
+
+Point it at your own agent (Python harness or HTTP endpoint), and gate CI on it:
+
+```bash
+costbomb run --target ./agent.py:handler --seed 1337          # explore
+costbomb baseline update --target ./agent.py:handler          # commit .costbomb-baseline.json
+costbomb run --target ./agent.py:handler --fail-on-regression # CI gate on spend regressions
+costbomb run --target ./agent.py:handler --dry-run            # fast, zero-paid-call CI smoke
+```
+
+Your agent's handler returns what it *spent* (a `RunRecord` of model calls, tool calls, and sub-agent spawns), or emits the OTel GenAI trace directly. costbomb meters that truthfully — see [`examples/demo_agent.py`](./examples/demo_agent.py).
 
 ## The attack library
 
-Named cost-explosion classes, each a seed strategy the fuzz engine mutates toward maximum spend: `retry-loop` · `tool-storm` · `context-bomb` · `recursion` · `clarification-trap`. The reporter ranks the worst offenders with exact reproduction, the $ each caused, and which class triggered — then the **CI gate** fails the build if worst-case cost regresses.
+Named cost-explosion classes, each a seed strategy the fuzz engine mutates toward maximum spend:
+`retry-loop` · `tool-storm` · `context-bomb` · `recursion` · `clarification-trap`.
+Each declares whether it `applies()` to your target, so coverage is honest ("skipped `recursion` — target has no spawn capability"). The reporter ranks the worst offenders with exact reproduction, the $ each caused (broken down by model / tool / spawn), and which class triggered — then the **CI gate** fails the build if worst-case cost regresses.
 
-See [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
+## How it works
+
+A **directed greybox fuzzer with a dollar-valued fitness function** (seed → evaluate → select → mutate), with three agent-specific twists:
+
+- **The cost meter is the oracle** — true dollars is a *sum over sources*: model tokens (input/output/reasoning/cache) **+** tool-call fees **+** recursive sub-agent spawn cost. A token-only meter misses exactly where `tool-storm` and `recursion` live.
+- **Fitness is p95 over k runs**, not one sample — the target is non-deterministic, so a scalar would make findings and the CI gate flap.
+- **A surrogate estimator pre-ranks candidates** so real dollars are spent only confirming the promising ones — and the whole search runs under a **hard cap on the fuzzer's own spend** (`--max-spend`, default $2). The tool that finds runaway spend must never run away itself.
+
+The CI gate **separates price drift from agent regression** (REQ-CI-3): it re-prices the baseline's recorded inputs under the current price table before comparing, so a provider raising prices doesn't fail your build — only a genuinely more-expensive-behaving agent does.
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/costbomb.yml
+name: costbomb
+on: [pull_request]
+jobs:
+  denial-of-wallet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install costbomb
+      - run: costbomb run --target ./agent.py:handler --fail-on-regression --dry-run
+```
+
+## Two launches, one codebase
+
+costbomb is deliberately one core with two thin entrypoints (the `Target` protocol is the seam):
+
+1. **Embedded (launch 1):** `costbomb-core` runs *inside* stampede as the `adversarial:economic` cohort — its findings appear as the economic section of stampede's Agent Readiness Report. This proves the engine on a real host.
+2. **Standalone (launch 2):** the same core, extracted behind this CLI + CI gate — *"denial-of-wallet fuzzing for AI agents."*
+
+Because the seam is `Target.invoke(input) -> Trace` from day one, extraction is a *packaging* move, not a rewrite. costbomb consumes stampede's shared contracts (the OTel GenAI trace profile, the `RunReport` model, the persona-pack schema) verbatim — vendored under [`src/costbomb/_vendor/`](./src/costbomb/_vendor/) until stampede publishes them as a package. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §6.
+
+## Design docs
+
+[`SPEC.md`](./SPEC.md) · [`docs/PRD.md`](./docs/PRD.md) (REQ/NFR IDs) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) (ADRs) · [`docs/DELIVERY-PLAN.md`](./docs/DELIVERY-PLAN.md) · [`docs/TEST-PLAN.md`](./docs/TEST-PLAN.md) · [`CLAUDE.md`](./CLAUDE.md).
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest            # 42 tests, unit → integration → e2e, mapped to the test plan
+ruff check src tests
+```
 
 ## Part of the Swarm Proof toolkit
 
