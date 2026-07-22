@@ -31,7 +31,8 @@ costbomb run --target fake --dry-run                        # zero-paid-call smo
 
 `pricing.py` + `meter.py` (the oracle) · `attacks/` (`base.py` interface + registry, `v01.py` 5
 classes) · `targets/` (`base.py` seam + `fake`/`python`/`http`/`persona`) · `estimator.py` ·
-`engine.py` (search) · `findings.py` · `report.py` · `ci.py` (gate+baseline) · `export.py` ·
+`engine.py` (search) · `mutator.py` (optional LLM-assisted mutation, `--use-llm`) · `findings.py` ·
+`report.py` · `ci.py` (gate+baseline) · `export.py` ·
 `cli.py` · `_vendor/` (vendored stampede contracts) · `data/prices.json`. Tests in `tests/`
 map to TEST-PLAN IDs (e.g. `test_it_2_own_budget_cap_never_exceeded`).
 

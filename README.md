@@ -46,7 +46,11 @@ costbomb run --target ./agent.py:handler --seed 1337          # explore
 costbomb baseline update --target ./agent.py:handler          # commit .costbomb-baseline.json
 costbomb run --target ./agent.py:handler --fail-on-regression # CI gate on spend regressions
 costbomb run --target ./agent.py:handler --dry-run            # fast, zero-paid-call CI smoke
+costbomb run --target ./agent.py:handler --use-llm            # optional LLM-assisted mutation (local Ollama by default)
+costbomb run --target mock:./agent.py:handler                 # safe default: side-effects hit mockworld fakes, no --allow-side-effects
 ```
+
+Template mutation is the default and needs no LLM. `--use-llm` lets a cheap/local model rewrite candidates toward more spend — and its own token cost is charged against the same `--max-spend` cap (the fuzzer can't secretly overspend on mutation), with automatic fallback to template mutation if the model is unavailable.
 
 Your agent's handler returns what it *spent* (a `RunRecord` of model calls, tool calls, and sub-agent spawns), or emits the OTel GenAI trace directly. costbomb meters that truthfully — see [`examples/demo_agent.py`](./examples/demo_agent.py).
 

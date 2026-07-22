@@ -36,6 +36,11 @@ def _build_target(spec: str) -> Target:
         from costbomb.targets.fake import FakeTarget
 
         return FakeTarget()
+    if spec.startswith("mock:"):
+        # `mock:<handler-spec>` — the safe default; effects hit mockworld fakes (NFR-5).
+        from costbomb.targets.mockworld_target import MockworldTarget
+
+        return MockworldTarget(spec[len("mock:"):])
     if spec.startswith(("http://", "https://")):
         from costbomb.targets.http_target import HTTPTarget
 
@@ -56,7 +61,7 @@ def _load_prices(price_table: str | None) -> PriceTable:
 
 def _make_config(
     *, seed: int, max_spend: float, budget: float | None, k: int, classes: str | None,
-    dry_run: bool, allow_side_effects: bool, generations: int,
+    dry_run: bool, allow_side_effects: bool, generations: int, use_llm: bool = False,
 ) -> SearchConfig:
     class_tuple = tuple(c.strip() for c in classes.split(",")) if classes else None
     return SearchConfig(
@@ -68,6 +73,7 @@ def _make_config(
         classes=class_tuple,
         dry_run=dry_run,
         allow_side_effects=allow_side_effects,
+        use_llm=use_llm,
     )
 
 
@@ -81,6 +87,9 @@ def run(
     classes: str | None = typer.Option(None, "--classes", help="Comma list to restrict attack classes."),
     generations: int = typer.Option(200, "--generations", help="Max search generations."),
     fail_on_regression: bool = typer.Option(False, "--fail-on-regression", help="Gate against .costbomb-baseline.json."),
+    use_llm: bool = typer.Option(False, "--use-llm", help="LLM-assisted mutation (default off; cheap/local, NFR-4)."),
+    llm_model: str = typer.Option("ollama:llama3", "--llm-model", help="Price-table key for the mutator model."),
+    llm_base_url: str = typer.Option("http://localhost:11434/v1", "--llm-base-url", help="OpenAI-compatible endpoint for the mutator."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Estimate only — zero paid calls, fast CI smoke (NFR-7)."),
     allow_side_effects: bool = typer.Option(False, "--allow-side-effects", help="Authorize hitting a real side-effecting target (NFR-5)."),
     price_table: str | None = typer.Option(None, "--price-table", help="Override the vendored price table (JSON)."),
@@ -94,8 +103,15 @@ def run(
     cfg = _make_config(
         seed=seed, max_spend=max_spend, budget=budget, k=k, classes=classes,
         dry_run=dry_run, allow_side_effects=allow_side_effects, generations=generations,
+        use_llm=use_llm,
     )
-    rf = FuzzEngine(tgt, prices=prices, config=cfg).run()
+    mutator = None
+    if use_llm:
+        from costbomb.mutator import LLMMutator
+
+        mutator = LLMMutator(model=llm_model, base_url=llm_base_url, prices=prices)
+        console.print(f"[dim]LLM mutator: {llm_model} @ {llm_base_url} (fallback: template)[/dim]")
+    rf = FuzzEngine(tgt, prices=prices, config=cfg, mutator=mutator).run()
     render_terminal(rf, console=console)
 
     if findings_out:
