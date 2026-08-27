@@ -1,20 +1,35 @@
 {
   "name": "opus-multiagent-spawn-rollup",
   "source": "synthetic",
+  "expected_usd_source": "hand_computed",
   "provider": "anthropic",
   "price_table_version": "2026-07-13",
   "expected_usd": 0.00675,
-  "expected_breakdown": { "model_usd": 0.00675, "tool_usd": 0.0, "spawn_usd": 0.00225 },
+  "expected_breakdown": {
+    "model_usd": 0.00675,
+    "tool_usd": 0.0,
+    "spawn_usd": 0.00225
+  },
   "provenance": "hand: parent 1000*3e-6+100*1.5e-5=0.0045; child 500*3e-6+50*1.5e-5=0.00225. Total 0.00675; spawn share 0.00225. Guards MA-3 (child rolls up to parent). NOT a real invoice.",
   "run": {
     "calls": [
-      { "model": "anthropic:claude-opus-4-8", "provider": "anthropic", "input_tokens": 1000, "output_tokens": 100 }
+      {
+        "model": "anthropic:claude-opus-4-8",
+        "provider": "anthropic",
+        "input_tokens": 1000,
+        "output_tokens": 100
+      }
     ],
     "tool_calls": [],
     "spawns": [
       {
         "calls": [
-          { "model": "anthropic:claude-opus-4-8", "provider": "anthropic", "input_tokens": 500, "output_tokens": 50 }
+          {
+            "model": "anthropic:claude-opus-4-8",
+            "provider": "anthropic",
+            "input_tokens": 500,
+            "output_tokens": 50
+          }
         ],
         "tool_calls": [],
         "spawns": []

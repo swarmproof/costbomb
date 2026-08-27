@@ -1,10 +1,15 @@
 {
   "name": "opus-cache-and-reasoning-token-classes",
   "source": "synthetic",
+  "expected_usd_source": "hand_computed",
   "provider": "anthropic",
   "price_table_version": "2026-07-13",
   "expected_usd": 0.03675,
-  "expected_breakdown": { "model_usd": 0.03675, "tool_usd": 0.0, "spawn_usd": 0.0 },
+  "expected_breakdown": {
+    "model_usd": 0.03675,
+    "tool_usd": 0.0,
+    "spawn_usd": 0.0
+  },
   "provenance": "hand: in 2000*3e-6=0.006; out 200*1.5e-5=0.003; reasoning 1500*1.5e-5=0.0225; cache_read 5000*3e-7=0.0015; cache_write 1000*3.75e-6=0.00375. Sum=0.03675. Guards MA-4 (distinct token classes). NOT a real invoice.",
   "run": {
     "calls": [
