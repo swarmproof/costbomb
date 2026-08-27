@@ -1,0 +1,16 @@
+{
+  "name": "gpt4o-mini-cross-provider-with-tool",
+  "source": "synthetic",
+  "provider": "openai",
+  "price_table_version": "2026-07-13",
+  "expected_usd": 0.0077,
+  "expected_breakdown": { "model_usd": 0.0027, "tool_usd": 0.005, "spawn_usd": 0.0 },
+  "provenance": "hand: in 10000*1.5e-7=0.0015; out 2000*6e-7=0.0012 => 0.0027 model; web_search=0.005. Sum=0.0077. Guards cross-provider pricing. NOT a real invoice.",
+  "run": {
+    "calls": [
+      { "model": "openai:gpt-4o-mini", "provider": "openai", "input_tokens": 10000, "output_tokens": 2000 }
+    ],
+    "tool_calls": ["web_search"],
+    "spawns": []
+  }
+}

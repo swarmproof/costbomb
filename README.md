@@ -96,6 +96,23 @@ costbomb is deliberately one core with two thin entrypoints (the `Target` protoc
 
 Because the seam is `Target.invoke(input) -> Trace` from day one, extraction is a *packaging* move, not a rewrite. costbomb consumes stampede's shared contracts (the OTel GenAI trace profile, the `RunReport` model, the persona-pack schema) verbatim — vendored under [`src/costbomb/_vendor/`](./src/costbomb/_vendor/) until stampede publishes them as a package. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §6.
 
+## Validation status (read before trusting the numbers)
+
+costbomb is **implemented and internally consistent, not yet validated against reality.**
+Being honest about this matters more for a cost tool than for most software: the whole
+product rests on the meter being right, and that claim isn't proven yet.
+
+| Proven (synthetic / unit) | Not yet validated (needs real runs) |
+|---|---|
+| Cost-meter **arithmetic** — token classes, tool fees, sub-agent roll-up (meter-accuracy harness, synthetic fixtures) | **Meter ≤1% vs a real provider invoice (NFR-8)** — needs ≥20 recorded real runs; the corpus test currently **skips** at `0/20` |
+| Hard own-budget cap holds across seeds (incl. LLM-mutation cost) | The 5¢→$5 story on a **real** LLM agent — only the scripted demo agent is cracked so far |
+| Determinism, gate red/green + price-drift-separation **logic** | Gate non-flakiness at recommended `k` on a **real** non-deterministic target |
+| Side-effect-free default; no-LLM/dry-run mode | Embedded path against a **real** stampede agent (`PersonaTarget` tested with a fake driver); `MockworldTarget` / `LLMMutator` against real backends (stub / mocked) |
+
+Until the real meter-accuracy corpus exists and passes, treat costbomb as a
+well-engineered prototype whose oracle is unproven. See
+[`tests/fixtures/meter/README.md`](./tests/fixtures/meter/README.md) to add real fixtures.
+
 ## Design docs
 
 [`SPEC.md`](./SPEC.md) · [`docs/PRD.md`](./docs/PRD.md) (REQ/NFR IDs) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) (ADRs) · [`docs/DELIVERY-PLAN.md`](./docs/DELIVERY-PLAN.md) · [`docs/TEST-PLAN.md`](./docs/TEST-PLAN.md) · [`CLAUDE.md`](./CLAUDE.md).
@@ -104,7 +121,7 @@ Because the seam is `Target.invoke(input) -> Trace` from day one, extraction is 
 
 ```bash
 pip install -e ".[dev]"
-pytest            # 42 tests, unit → integration → e2e, mapped to the test plan
+pytest            # unit → integration → e2e + meter-accuracy corpus, mapped to the test plan
 ruff check src tests
 ```
 
