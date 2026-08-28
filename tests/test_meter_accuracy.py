@@ -101,18 +101,33 @@ def test_ma5_price_table_version_pinned() -> None:
         assert fx["price_table_version"] == pt.version
 
 
+def test_real_fixtures_declare_a_valid_ground_truth() -> None:
+    """Schema guard — a `real` fixture must say where its cost came from."""
+    valid = {"invoice", "usage_x_published_price"}
+    for fx in FIXTURES:
+        if fx.get("source") == "real":
+            assert fx.get("expected_usd_source") in valid, (
+                f"{fx['name']}: real fixtures need expected_usd_source ∈ {valid}"
+            )
+
+
 def test_ma1_real_invoice_corpus() -> None:
     """AC-1 — the ≤1% claim is only *proven* by real provider invoices.
 
     Skips (loudly) until the real corpus exists, so a synthetic-only green run is
-    never mistaken for real-world validation.
+    never mistaken for real-world validation. Invoice-grounded reals are counted
+    separately from price-derived ones (which are partly circular — see the fixtures
+    README).
     """
     real = [f for f in FIXTURES if f.get("source") == "real"]
-    if len(real) < REQUIRED_REAL:
+    invoice = [f for f in real if f.get("expected_usd_source") == "invoice"]
+    if len(invoice) < REQUIRED_REAL:
         pytest.skip(
-            f"meter NOT YET validated against real invoices: {len(real)}/{REQUIRED_REAL} "
-            "real fixtures present. Synthetic fixtures prove arithmetic only. "
-            "Add real recorded runs (see tests/fixtures/meter/README.md) to prove NFR-8."
+            f"meter NOT YET validated against real invoices: "
+            f"{len(invoice)}/{REQUIRED_REAL} invoice-grounded fixtures "
+            f"({len(real)} real total). Synthetic/price-derived fixtures prove arithmetic "
+            "and cost-source coverage only. Add invoice-grounded runs "
+            "(see tests/fixtures/meter/README.md) to prove NFR-8."
         )
     for fx in real:
         bd = _metered(fx)
