@@ -200,6 +200,25 @@ def attacks() -> None:
         console.print(f"[bold]{a.name}[/bold] — {a.description}")
 
 
+@app.command()
+def proxy(
+    upstream: str = typer.Option(..., "--upstream", help="Real provider base URL to forward to (e.g. https://api.openai.com)."),
+    port: int = typer.Option(8100, "--port", help="Local port to listen on."),
+    price_table: str | None = typer.Option(None, "--price-table"),
+) -> None:
+    """Run the metering proxy — point your agent's model base_url here (REQ-CM-5c)."""
+    prices = _load_prices(price_table)
+    from costbomb.proxy_server import run_server
+
+    console.print(
+        f"[bold]costbomb proxy[/bold] → {upstream}\n"
+        f"listening on [bold]http://127.0.0.1:{port}[/bold] — set your agent's model "
+        f"base_url to this, send [dim]x-costbomb-run[/dim] headers to attribute runs.\n"
+        f"[dim]price table {prices.version} · Ctrl-C to stop[/dim]"
+    )
+    run_server(upstream=upstream, port=port, prices=prices)
+
+
 @app.command("price")
 def price(
     price_table: str | None = typer.Option(None, "--price-table"),

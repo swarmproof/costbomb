@@ -96,6 +96,42 @@ costbomb is deliberately one core with two thin entrypoints (the `Target` protoc
 
 Because the seam is `Target.invoke(input) -> Trace` from day one, extraction is a *packaging* move, not a rewrite. costbomb consumes stampede's shared contracts (the OTel GenAI trace profile, the `RunReport` model, the persona-pack schema) verbatim — vendored under [`src/costbomb/_vendor/`](./src/costbomb/_vendor/) until stampede publishes them as a package. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §6.
 
+## Metering a real agent (no instrumentation)
+
+Real agents aren't `./agent.py:handler` files — they're live services, framework
+graphs, MCP servers, or product sessions. costbomb needs two things from any of them:
+to **drive** it with adversarial inputs, and to **meter** what each run costs. The
+low-friction way to meter is the **proxy** — point your agent's model `base_url` at
+costbomb and every LLM call is metered automatically, with **zero code changes**:
+
+```bash
+costbomb proxy --upstream https://api.anthropic.com --port 8100
+# then set your agent's model base_url to http://127.0.0.1:8100
+```
+
+```
+   your agent (unchanged)
+        │  base_url → costbomb proxy      ← one env var; the whole integration
+        ▼
+   costbomb meter ── forwards ──▶  Anthropic / OpenAI / any compatible upstream
+        │  reads real usage per call (input/output/reasoning/cache), prices it
+        ▼
+   fuzzer drives inputs via your agent's existing endpoint; brackets each run
+```
+
+- **In-process agents** (a framework graph, direct-SDK code): use `ProxyTarget` — it
+  brackets one driven input as one metered run while the agent's calls flow through a
+  shared `ProxyMeter`. No `RunRecord`, no handler.
+- **Out-of-process agents** (HTTP/MCP service): run `costbomb proxy`; the fuzzer
+  brackets a run with `POST /costbomb/run/start` … `/finish`, and calls carrying an
+  `x-costbomb-run` header are attributed to it.
+
+Because fuzzing has to *try* inputs (you can't find the worst input from passive
+logs), costbomb always drives the agent through the interface it already exposes —
+but metering never requires touching the agent's code. A useful side effect: a proxy
+sitting in front of a real provider records real usage, which is exactly what the
+meter-accuracy corpus needs (below).
+
 ## Validation status (read before trusting the numbers)
 
 costbomb is **implemented and internally consistent, not yet validated against reality.**
