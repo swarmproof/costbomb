@@ -30,7 +30,8 @@ costbomb run --target fake --dry-run                        # zero-paid-call smo
 ### Package map (`src/costbomb/`)
 
 `pricing.py` + `meter.py` (the oracle) · `attacks/` (`base.py` interface + registry, `v01.py` 5
-classes) · `targets/` (`base.py` seam + `fake`/`python`/`http`/`persona`) · `estimator.py` ·
+classes) · `targets/` (`base.py` seam + `fake`/`python`/`http`/`persona`/`proxy`) ·
+`proxy.py` + `proxy_server.py` (zero-instrumentation metering: `costbomb proxy`, base_url swap) · `estimator.py` ·
 `engine.py` (search) · `mutator.py` (optional LLM-assisted mutation, `--use-llm`) · `findings.py` ·
 `report.py` · `ci.py` (gate+baseline) · `export.py` ·
 `cli.py` · `_vendor/` (vendored stampede contracts) · `data/prices.json`. Tests in `tests/`
