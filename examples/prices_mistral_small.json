@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "version": "live-mistral-small-2026-09",
+    "source": "illustrative published Mistral small rates, for the local Ollama live test",
+    "note": "Ollama runs mistral-small locally for $0. To make the live test show real DOLLARS, we price the REAL token usage at Mistral's published small-model rate (~$0.10/1M in, $0.30/1M out). This is honest re-pricing of real usage (REQ-CM-8), not a real invoice."
+  },
+  "models": {
+    "mistral-small:latest": {
+      "input_cost_per_token": 1.0e-07,
+      "output_cost_per_token": 3.0e-07
+    },
+    "openai:gpt-4o-mini": {
+      "input_cost_per_token": 1.5e-07,
+      "output_cost_per_token": 6.0e-07
+    }
+  },
+  "tools": {
+    "web_search": { "price_per_call": 0.005 },
+    "premium_api": { "price_per_call": 0.02 }
+  }
+}
