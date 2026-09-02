@@ -68,6 +68,8 @@ def render_terminal(rf: RunFindings, *, console: Console | None = None) -> None:
             f"{_fmt_usd(bd.model_usd)} / {_fmt_usd(bd.tool_usd)} / {_fmt_usd(bd.spawn_usd)}"
             f"  [dim]({bd.n_model_calls}c/{bd.n_tool_calls}t/{bd.n_spawns}s)[/dim]"
         )
+        if bd.infra_usd > 0:
+            breakdown += f"  [dim]+{_fmt_usd(bd.infra_usd)} infra/{bd.duration_s:.0f}s[/dim]"
         table.add_row(
             str(f.rank),
             f.attack_class,

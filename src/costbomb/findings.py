@@ -59,6 +59,8 @@ class Finding(BaseModel):
                 "model_usd": round(self.breakdown.model_usd, 6),
                 "tool_usd": round(self.breakdown.tool_usd, 6),
                 "spawn_usd": round(self.breakdown.spawn_usd, 6),
+                "infra_usd": round(self.breakdown.infra_usd, 6),
+                "duration_s": round(self.breakdown.duration_s, 4),
                 "downstream_usd": round(self.breakdown.downstream_usd, 6),
                 "blast_radius_usd": round(self.breakdown.blast_radius_usd, 6),
                 "by_model": self.breakdown.by_model,

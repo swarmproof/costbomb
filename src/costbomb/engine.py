@@ -45,7 +45,8 @@ class SearchConfig:
     wall_clock_s: float | None = None
     top_k_ratio: float = 0.5  # surrogate: pay only for est in the top fraction
     min_history_before_prune: int = 8
-    cap_safety: float = 1.25  # headroom on the cap reservation so it holds strictly (NFR-1)
+    cap_safety: float = 1.5  # headroom on the cap reservation so it holds under a
+    # climbing search whose per-run cost keeps growing (structural variance, e.g. infra). NFR-1.
     classes: tuple[str, ...] | None = None  # None → all applicable
     use_llm: bool = False
     dry_run: bool = False  # estimate only, zero paid calls (REQ-CI-4, NFR-7)
@@ -259,11 +260,13 @@ class FuzzEngine:
         worst_trace: Trace | None = None
         worst_metric = -1.0
         used = 0.0
-        # Reserve the larger of the candidate's estimate and the worst real run seen,
-        # so the guard is backed by an observed upper bound — a predictor that
-        # under-estimates must never be able to breach the cap (NFR-1, E2E-4).
-        reservation = max(self.estimator.estimate_input(input), self._max_run_cost, 1e-6) * cfg.cap_safety
+        est = self.estimator.estimate_input(input)
         for i in range(k):
+            # Reserve the larger of the candidate's estimate and the worst real run
+            # seen (recomputed each iteration so a new cost-record run tightens the
+            # next guard) — a predictor that under-estimates must never breach the cap
+            # (NFR-1, E2E-4). Overage is bounded to at most one run beyond the cap.
+            reservation = max(est, self._max_run_cost, 1e-6) * cfg.cap_safety
             # Cap guard: never *start* a run we cannot afford (SA-4, E2E-4).
             if self._own_spend + used + reservation > cfg.max_spend_usd:
                 return _EvalResult(

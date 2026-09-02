@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "version": "infra-demo-2026-09",
+    "source": "vendored models/tools + an illustrative dedicated-GPU infra rate",
+    "note": "infra.usd_per_second prices wall-clock/compute time (Delivery 2). $0.01/s ≈ a dedicated GPU instance. Illustrative, not a real quote."
+  },
+  "infra": { "usd_per_second": 0.01 },
+  "models": {
+    "anthropic:claude-haiku-4-5": {
+      "input_cost_per_token": 8.0e-07,
+      "output_cost_per_token": 4.0e-06
+    }
+  },
+  "tools": {
+    "premium_api": { "price_per_call": 0.02 }
+  }
+}

@@ -73,12 +73,13 @@ class RunRecord:
     calls: list[ModelCall] = field(default_factory=list)
     tool_calls: list[str] = field(default_factory=list)
     spawns: list[RunRecord] = field(default_factory=list)
+    duration_s: float = 0.0  # wall-clock seconds, for infra/compute cost (Delivery 2)
 
     def to_trace(self, *, seed: int, attack_class: str = "", estimated: bool = False) -> Trace:
         tb = TraceBuilder(seed, attack_class=attack_class)
         root = tb.root()
         self._emit(tb, root)
-        return tb.build(estimated=estimated)
+        return tb.build(estimated=estimated, duration_s=self.duration_s)
 
     def _emit(self, tb: TraceBuilder, parent: Span) -> None:
         for call in self.calls:

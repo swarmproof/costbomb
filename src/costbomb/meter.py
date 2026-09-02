@@ -33,10 +33,12 @@ class CostBreakdown(BaseModel):
     into the total (the sub-agent share), not an extra term.
     """
 
-    total_usd: float = 0.0  # the agent's own bill: model tokens + direct tool fees
+    total_usd: float = 0.0  # the agent's own bill: model tokens + tool fees + infra
     model_usd: float = 0.0
     tool_usd: float = 0.0
     spawn_usd: float = 0.0
+    infra_usd: float = 0.0  # wall-clock/compute cost (Delivery 2)
+    duration_s: float = 0.0
     # Delivery 1: real-world consequence cost the tools caused, and the full money at
     # risk. `blast_radius_usd == total_usd + downstream_usd`. total_usd stays the
     # direct bill (baseline-compatible); blast radius is the true denial-of-wallet number.
@@ -111,7 +113,9 @@ class CostMeter:
             if span.get(Swarmproof.COST_ESTIMATED):
                 bd.estimated = True
 
-        bd.total_usd = bd.model_usd + bd.tool_usd
+        bd.duration_s = trace.duration_s
+        bd.infra_usd = trace.duration_s * self.prices.infra_usd_per_second
+        bd.total_usd = bd.model_usd + bd.tool_usd + bd.infra_usd
         bd.spawn_usd = self._spawn_share(trace, self_cost)
         bd.n_spawns = self._count_spawns(trace)
 
@@ -122,6 +126,7 @@ class CostMeter:
         bd.model_usd = round(bd.model_usd, 10)
         bd.tool_usd = round(bd.tool_usd, 10)
         bd.spawn_usd = round(bd.spawn_usd, 10)
+        bd.infra_usd = round(bd.infra_usd, 10)
         bd.downstream_usd = round(bd.downstream_usd, 10)
         bd.blast_radius_usd = round(bd.blast_radius_usd, 10)
         bd.by_model = {k: round(v, 10) for k, v in sorted(bd.by_model.items())}

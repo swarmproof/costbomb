@@ -194,6 +194,9 @@ class Trace:
     # Set True when any span's cost is estimated rather than metered from real usage
     # (wire-estimate fallback or dry-run). Surfaces in the report as `estimated`.
     estimated: bool = False
+    # Real wall-clock seconds the run took — priced as infra/compute cost when the
+    # table sets an infra rate (Delivery 2). 0.0 when unknown (backward compatible).
+    duration_s: float = 0.0
 
     def add(self, span: Span) -> Span:
         self.spans.append(span)
@@ -209,6 +212,7 @@ class Trace:
         return {
             "root_span_id": self.root_span_id,
             "estimated": self.estimated,
+            "duration_s": self.duration_s,
             "spans": [s.to_dict() for s in self.spans],
         }
 
@@ -217,5 +221,6 @@ class Trace:
         return cls(
             root_span_id=d["root_span_id"],
             estimated=d.get("estimated", False),
+            duration_s=d.get("duration_s", 0.0),
             spans=[Span.from_dict(s) for s in d.get("spans", [])],
         )
