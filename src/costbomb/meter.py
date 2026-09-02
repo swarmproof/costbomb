@@ -20,10 +20,33 @@ is the oracle.
 
 from __future__ import annotations
 
+from typing import Protocol, runtime_checkable
+
 from pydantic import BaseModel, Field
 
 from costbomb._vendor.trace import CostSource, GenAI, Span, Swarmproof, Trace
 from costbomb.pricing import PriceTable
+
+
+@runtime_checkable
+class DedupChecker(Protocol):
+    """Decides how many repeated side-effecting calls are at-risk duplicates.
+
+    The dedup decision is delegated so it can be backed by the real ``exactly_once``
+    middleware (``costbomb.integrations.exactly_once``) rather than reinvented — the
+    native default just encodes the same rule: repeats sharing a business key, minus
+    the calls the target already deduped, are the double-charge exposure (REQ-RP-4).
+    """
+
+    def at_risk_duplicates(self, tool: str, keys: list[str], deduped: list[bool]) -> int: ...
+
+
+class NativeDedupChecker:
+    """Dependency-free dedup: at-risk = live calls − distinct keys among them."""
+
+    def at_risk_duplicates(self, tool: str, keys: list[str], deduped: list[bool]) -> int:
+        live = [k for k, d in zip(keys, deduped, strict=False) if not d]
+        return len(live) - len(set(live))
 
 
 class CostBreakdown(BaseModel):
@@ -93,8 +116,9 @@ class CostMeter:
     (REQ-CI-3) possible — you just call :meth:`cost` again with a different table.
     """
 
-    def __init__(self, prices: PriceTable) -> None:
+    def __init__(self, prices: PriceTable, *, dedup_checker: DedupChecker | None = None) -> None:
         self.prices = prices
+        self.dedup_checker: DedupChecker = dedup_checker or NativeDedupChecker()
 
     def cost(self, trace: Trace, *, annotate: bool = True) -> CostBreakdown:
         """Compute the full breakdown for one run.
@@ -105,10 +129,15 @@ class CostMeter:
         """
         bd = CostBreakdown(estimated=trace.estimated)
         self_cost: dict[str, float] = {}
+        tool_events: list[tuple[str, str, bool]] = []  # (tool, business-key, deduped)
 
         for span in trace.spans:
             source, amount = self._span_cost(span, bd)
             self_cost[span.span_id] = amount
+            if _is_tool_span(span):
+                name = span.get(GenAI.TOOL_NAME, "unknown_tool")
+                key = span.get(Swarmproof.TOOL_IDEMPOTENCY_KEY) or name  # fallback: name = one key
+                tool_events.append((name, key, bool(span.get(Swarmproof.RECOVERY_EXACTLY_ONCE))))
             if source is None:
                 continue
             if annotate:
@@ -126,12 +155,22 @@ class CostMeter:
         bd.blast_radius_usd = bd.total_usd + bd.downstream_usd
 
         # Exactly-once cross-check (REQ-RP-4): repeated calls to a side-effecting tool
-        # are duplicate real effects unless the tool is idempotent. Cost the repeats.
-        for tool, count in bd.tool_call_counts.items():
-            if count > 1 and self.prices.tool_side_effecting(tool):
-                dups = count - 1
-                bd.duplicate_calls[tool] = dups
-                bd.duplicate_effect_usd += dups * self.prices.tool_downstream(tool)
+        # that share a business key are duplicate real effects — unless the target
+        # already deduped them. The dedup decision is delegated to the checker (backed
+        # by the real exactly_once middleware when wired), keyed on business identity
+        # so 34 charges to *one* order count, but 34 charges to 34 orders don't.
+        by_tool: dict[str, tuple[list[str], list[bool]]] = {}
+        for name, key, deduped in tool_events:
+            keys, flags = by_tool.setdefault(name, ([], []))
+            keys.append(key)
+            flags.append(deduped)
+        for tool, (keys, flags) in by_tool.items():
+            if not self.prices.tool_side_effecting(tool):
+                continue
+            at_risk = self.dedup_checker.at_risk_duplicates(tool, keys, flags)
+            if at_risk > 0:
+                bd.duplicate_calls[tool] = at_risk
+                bd.duplicate_effect_usd += at_risk * self.prices.tool_downstream(tool)
 
         # Deterministic, cent-clean rounding for reports/baselines (NFR-2).
         bd.total_usd = round(bd.total_usd, 10)
@@ -222,4 +261,4 @@ class CostMeter:
         the baseline's stored inputs/traces are re-priced under the current table
         before comparison, so a price hike alone never fails a build.
         """
-        return CostMeter(table).cost(trace, annotate=False)
+        return CostMeter(table, dedup_checker=self.dedup_checker).cost(trace, annotate=False)

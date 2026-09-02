@@ -13,13 +13,20 @@ from typing import Any
 from costbomb._vendor.trace import Trace
 from costbomb.attacks.base import Input, TargetCapabilities
 from costbomb.errors import SideEffectError
-from costbomb.targets.base import ModelCall, RunRecord, TargetContext, coerce_trace
+from costbomb.targets.base import ModelCall, RunRecord, TargetContext, ToolCall, coerce_trace
+
+
+def _parse_tool(t: Any) -> str | ToolCall:
+    return ToolCall(**t) if isinstance(t, dict) else t
 
 
 def _parse_run_record(payload: dict[str, Any]) -> RunRecord:
-    """Parse a JSON payload into a RunRecord (recursive for spawns)."""
+    """Parse a JSON payload into a RunRecord (recursive for spawns).
+
+    A tool call may be a bare name or an object ``{"name", "key", "deduped"}``.
+    """
     calls = [ModelCall(**c) for c in payload.get("calls", [])]
-    tool_calls = list(payload.get("tool_calls", []))
+    tool_calls = [_parse_tool(t) for t in payload.get("tool_calls", [])]
     spawns = [_parse_run_record(s) for s in payload.get("spawns", [])]
     return RunRecord(calls=calls, tool_calls=tool_calls, spawns=spawns)
 

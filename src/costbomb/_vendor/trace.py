@@ -63,6 +63,7 @@ class Swarmproof:
     COST_SOURCE = "swarmproof.cost.source"  # "model" | "tool" | "spawn"
     COST_ESTIMATED = "swarmproof.cost.estimated"  # True → not a paid reading
     TOOL_PRICE_USD = "swarmproof.tool.price_usd"  # per-tool-call fee at run time
+    TOOL_IDEMPOTENCY_KEY = "swarmproof.tool.idempotency_key"  # business key for exactly-once
     ATTACK_CLASS = "swarmproof.attack.class"  # which AttackClass produced the input
     ATTACK_SEED = "swarmproof.attack.seed"
 

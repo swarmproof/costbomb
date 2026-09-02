@@ -61,6 +61,21 @@ class ModelCall:
 
 
 @dataclass
+class ToolCall:
+    """One tool invocation an agent made.
+
+    ``key`` is the effect's **business identity** (e.g. ``charge:order-42``) — what
+    exactly-once dedupes on. Two calls sharing a key are the *same* effect (a
+    double-charge risk); distinct keys are distinct legitimate effects. ``deduped``
+    marks a call the agent's own idempotency layer already fired-once.
+    """
+
+    name: str
+    key: str | None = None
+    deduped: bool = False
+
+
+@dataclass
 class RunRecord:
     """What a Python/HTTP target returns so costbomb can meter it truthfully.
 
@@ -68,10 +83,13 @@ class RunRecord:
     costbomb what it spent — model calls, tool calls, and (recursively) spawned
     sub-agents. costbomb converts it to a :class:`Trace`; the meter does the rest.
     An agent already emitting the OTel GenAI trace can return a ``Trace`` directly.
+
+    ``tool_calls`` accepts a bare name (``str``) or a :class:`ToolCall` (with a
+    business key), so keyed exactly-once cross-checks work without breaking callers.
     """
 
     calls: list[ModelCall] = field(default_factory=list)
-    tool_calls: list[str] = field(default_factory=list)
+    tool_calls: list[str | ToolCall] = field(default_factory=list)
     spawns: list[RunRecord] = field(default_factory=list)
     duration_s: float = 0.0  # wall-clock seconds, for infra/compute cost (Delivery 2)
 
@@ -94,7 +112,10 @@ class RunRecord:
                 cache_write_tokens=call.cache_write_tokens,
             )
         for tool in self.tool_calls:
-            tb.tool(parent, tool_name=tool)
+            if isinstance(tool, ToolCall):
+                tb.tool(parent, tool_name=tool.name, key=tool.key, deduped=tool.deduped)
+            else:
+                tb.tool(parent, tool_name=tool)
         for sub in self.spawns:
             sub_root = tb.spawn(parent)
             sub._emit(tb, sub_root)
