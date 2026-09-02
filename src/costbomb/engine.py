@@ -330,7 +330,7 @@ class FuzzEngine:
         for class_name, (input, res) in best.items():
             worst = _percentile(res.samples, self.config.p95)
             bd = res.worst_breakdown
-            side_effect_risk = bd.n_tool_calls > 0 and any(v > 0 for v in bd.by_tool.values())
+            side_effect_risk = bool(bd.side_effecting_tools) or bd.duplicate_effect_usd > 0
             result.findings.append(
                 Finding(
                     rank=0,

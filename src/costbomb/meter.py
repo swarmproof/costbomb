@@ -51,6 +51,10 @@ class CostBreakdown(BaseModel):
     n_spawns: int = 0
     tool_call_counts: dict[str, int] = Field(default_factory=dict)
     side_effecting_tools: list[str] = Field(default_factory=list)
+    # Delivery 3 (exactly-once, REQ-RP-4): money at risk from repeated calls to a
+    # side-effecting tool if it isn't idempotent — the double-charge exposure.
+    duplicate_effect_usd: float = 0.0
+    duplicate_calls: dict[str, int] = Field(default_factory=dict)
     estimated: bool = False
     unpriced_tools: list[str] = Field(default_factory=list)
 
@@ -121,6 +125,14 @@ class CostMeter:
 
         bd.blast_radius_usd = bd.total_usd + bd.downstream_usd
 
+        # Exactly-once cross-check (REQ-RP-4): repeated calls to a side-effecting tool
+        # are duplicate real effects unless the tool is idempotent. Cost the repeats.
+        for tool, count in bd.tool_call_counts.items():
+            if count > 1 and self.prices.tool_side_effecting(tool):
+                dups = count - 1
+                bd.duplicate_calls[tool] = dups
+                bd.duplicate_effect_usd += dups * self.prices.tool_downstream(tool)
+
         # Deterministic, cent-clean rounding for reports/baselines (NFR-2).
         bd.total_usd = round(bd.total_usd, 10)
         bd.model_usd = round(bd.model_usd, 10)
@@ -128,6 +140,8 @@ class CostMeter:
         bd.spawn_usd = round(bd.spawn_usd, 10)
         bd.infra_usd = round(bd.infra_usd, 10)
         bd.downstream_usd = round(bd.downstream_usd, 10)
+        bd.duplicate_effect_usd = round(bd.duplicate_effect_usd, 10)
+        bd.duplicate_calls = dict(sorted(bd.duplicate_calls.items()))
         bd.blast_radius_usd = round(bd.blast_radius_usd, 10)
         bd.by_model = {k: round(v, 10) for k, v in sorted(bd.by_model.items())}
         bd.by_tool = {k: round(v, 10) for k, v in sorted(bd.by_tool.items())}

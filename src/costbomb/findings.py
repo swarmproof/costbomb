@@ -63,6 +63,8 @@ class Finding(BaseModel):
                 "duration_s": round(self.breakdown.duration_s, 4),
                 "downstream_usd": round(self.breakdown.downstream_usd, 6),
                 "blast_radius_usd": round(self.breakdown.blast_radius_usd, 6),
+                "duplicate_effect_usd": round(self.breakdown.duplicate_effect_usd, 6),
+                "duplicate_calls": self.breakdown.duplicate_calls,
                 "by_model": self.breakdown.by_model,
                 "by_tool": self.breakdown.by_tool,
                 "n_model_calls": self.breakdown.n_model_calls,

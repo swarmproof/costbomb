@@ -104,6 +104,12 @@ def render_terminal(rf: RunFindings, *, console: Console | None = None) -> None:
                 border_style="red",
             )
         )
+        if bd.duplicate_effect_usd > 0:
+            dups = ", ".join(f"{t}×{n + 1}" for t, n in bd.duplicate_calls.items())
+            console.print(
+                f"  [red]exactly-once risk:[/red] {_fmt_usd(bd.duplicate_effect_usd)} in "
+                f"duplicate effects if not idempotent ([bold]{dups}[/bold] — only 1 intended)"
+            )
 
     if rf.classes_skipped:
         console.print(
