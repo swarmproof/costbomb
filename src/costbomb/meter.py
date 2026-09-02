@@ -33,15 +33,22 @@ class CostBreakdown(BaseModel):
     into the total (the sub-agent share), not an extra term.
     """
 
-    total_usd: float = 0.0
+    total_usd: float = 0.0  # the agent's own bill: model tokens + direct tool fees
     model_usd: float = 0.0
     tool_usd: float = 0.0
     spawn_usd: float = 0.0
+    # Delivery 1: real-world consequence cost the tools caused, and the full money at
+    # risk. `blast_radius_usd == total_usd + downstream_usd`. total_usd stays the
+    # direct bill (baseline-compatible); blast radius is the true denial-of-wallet number.
+    downstream_usd: float = 0.0
+    blast_radius_usd: float = 0.0
     by_model: dict[str, float] = Field(default_factory=dict)
     by_tool: dict[str, float] = Field(default_factory=dict)
     n_model_calls: int = 0
     n_tool_calls: int = 0
     n_spawns: int = 0
+    tool_call_counts: dict[str, int] = Field(default_factory=dict)
+    side_effecting_tools: list[str] = Field(default_factory=list)
     estimated: bool = False
     unpriced_tools: list[str] = Field(default_factory=list)
 
@@ -108,13 +115,18 @@ class CostMeter:
         bd.spawn_usd = self._spawn_share(trace, self_cost)
         bd.n_spawns = self._count_spawns(trace)
 
+        bd.blast_radius_usd = bd.total_usd + bd.downstream_usd
+
         # Deterministic, cent-clean rounding for reports/baselines (NFR-2).
         bd.total_usd = round(bd.total_usd, 10)
         bd.model_usd = round(bd.model_usd, 10)
         bd.tool_usd = round(bd.tool_usd, 10)
         bd.spawn_usd = round(bd.spawn_usd, 10)
+        bd.downstream_usd = round(bd.downstream_usd, 10)
+        bd.blast_radius_usd = round(bd.blast_radius_usd, 10)
         bd.by_model = {k: round(v, 10) for k, v in sorted(bd.by_model.items())}
         bd.by_tool = {k: round(v, 10) for k, v in sorted(bd.by_tool.items())}
+        bd.side_effecting_tools = sorted(set(bd.side_effecting_tools))
         return bd
 
     # ---- per-span costing ----
@@ -126,7 +138,11 @@ class CostMeter:
             if not self.prices.has_tool(name) and name not in bd.unpriced_tools:
                 bd.unpriced_tools.append(name)
             bd.tool_usd += fee
+            bd.downstream_usd += self.prices.tool_downstream(name)  # consequence cost
             bd.by_tool[name] = bd.by_tool.get(name, 0.0) + fee
+            bd.tool_call_counts[name] = bd.tool_call_counts.get(name, 0) + 1
+            if self.prices.tool_side_effecting(name) and name not in bd.side_effecting_tools:
+                bd.side_effecting_tools.append(name)
             bd.n_tool_calls += 1
             return CostSource.TOOL, fee
 

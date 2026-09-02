@@ -62,6 +62,7 @@ def _load_prices(price_table: str | None) -> PriceTable:
 def _make_config(
     *, seed: int, max_spend: float, budget: float | None, k: int, classes: str | None,
     dry_run: bool, allow_side_effects: bool, generations: int, use_llm: bool = False,
+    fitness: str = "total_usd",
 ) -> SearchConfig:
     class_tuple = tuple(c.strip() for c in classes.split(",")) if classes else None
     return SearchConfig(
@@ -74,6 +75,7 @@ def _make_config(
         dry_run=dry_run,
         allow_side_effects=allow_side_effects,
         use_llm=use_llm,
+        fitness=fitness,
     )
 
 
@@ -84,6 +86,7 @@ def run(
     max_spend: float = typer.Option(2.0, "--max-spend", help="Hard cap on the fuzzer's OWN spend (NFR-1)."),
     seed: int = typer.Option(1337, "--seed", help="Deterministic search seed."),
     k: int = typer.Option(5, "--k", help="Runs per candidate; fitness is p95 over k."),
+    fitness: str = typer.Option("total_usd", "--fitness", help="Maximize 'total_usd' (direct bill) or 'blast_radius_usd' (incl. downstream side-effects)."),
     classes: str | None = typer.Option(None, "--classes", help="Comma list to restrict attack classes."),
     generations: int = typer.Option(200, "--generations", help="Max search generations."),
     fail_on_regression: bool = typer.Option(False, "--fail-on-regression", help="Gate against .costbomb-baseline.json."),
@@ -103,7 +106,7 @@ def run(
     cfg = _make_config(
         seed=seed, max_spend=max_spend, budget=budget, k=k, classes=classes,
         dry_run=dry_run, allow_side_effects=allow_side_effects, generations=generations,
-        use_llm=use_llm,
+        use_llm=use_llm, fitness=fitness,
     )
     mutator = None
     if use_llm:

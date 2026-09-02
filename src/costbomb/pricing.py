@@ -38,7 +38,18 @@ class ModelPrice(BaseModel):
 
 
 class ToolPrice(BaseModel):
+    """Cost of one tool call.
+
+    ``price_per_call`` is the *direct* fee costbomb's target pays to invoke the tool
+    (an API charge). ``downstream_usd`` is the *consequence* cost each call causes in
+    the real world — the money a ``charge_card`` moves, the cost of an email blast —
+    the true denial-of-wallet blast radius (Delivery 1). ``side_effecting`` marks a
+    tool whose calls have real effects (feeds duplicate-charge detection, Delivery 3).
+    """
+
     price_per_call: float = 0.0
+    downstream_usd: float = 0.0
+    side_effecting: bool = False
 
 
 class PriceTable(BaseModel):
@@ -101,3 +112,12 @@ class PriceTable(BaseModel):
 
     def has_tool(self, tool_name: str) -> bool:
         return tool_name in self.tools
+
+    def tool_downstream(self, tool_name: str) -> float:
+        """Real-world consequence cost of one call (the blast radius). 0 if unknown."""
+        entry = self.tools.get(tool_name)
+        return entry.downstream_usd if entry else 0.0
+
+    def tool_side_effecting(self, tool_name: str) -> bool:
+        entry = self.tools.get(tool_name)
+        return bool(entry and entry.side_effecting)
