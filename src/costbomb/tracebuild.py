@@ -89,16 +89,25 @@ class TraceBuilder:
             span.set(Swarmproof.USAGE_CACHE_WRITE_TOKENS, cache_write_tokens)
         return span
 
-    def tool(self, parent: Span, *, tool_name: str) -> Span:
+    def tool(
+        self, parent: Span, *, tool_name: str, key: str | None = None, deduped: bool = False
+    ) -> Span:
         span = self._span("execute_tool", SpanKind.CLIENT, parent, "execute_tool")
         span.set(GenAI.TOOL_NAME, tool_name)
+        if key is not None:
+            span.set(Swarmproof.TOOL_IDEMPOTENCY_KEY, key)  # business identity (exactly-once)
+        if deduped:
+            span.set(Swarmproof.RECOVERY_EXACTLY_ONCE, True)  # already fired-once by the target
         return span
 
     def spawn(self, parent: Span, *, name: str = "sub-agent") -> Span:
         """A spawned sub-agent (non-root ``invoke_agent``); attach child spans to it."""
         return self._span(name, SpanKind.INTERNAL, parent, "invoke_agent")
 
-    def build(self, *, estimated: bool = False) -> Trace:
+    def build(self, *, estimated: bool = False, duration_s: float = 0.0) -> Trace:
         if self._root_id is None:  # pragma: no cover - defensive
             raise ValueError("TraceBuilder.build() called before root()")
-        return Trace(root_span_id=self._root_id, spans=self._spans, estimated=estimated)
+        return Trace(
+            root_span_id=self._root_id, spans=self._spans, estimated=estimated,
+            duration_s=duration_s,
+        )

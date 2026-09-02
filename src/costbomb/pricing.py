@@ -59,6 +59,9 @@ class PriceTable(BaseModel):
     source: str = "unknown"
     models: dict[str, ModelPrice] = Field(default_factory=dict)
     tools: dict[str, ToolPrice] = Field(default_factory=dict)
+    # Wall-clock/compute cost per second (GPU-seconds, serverless duration). Default 0
+    # so time-based cost is opt-in and existing tables/baselines are unaffected.
+    infra_usd_per_second: float = 0.0
 
     # ---- construction ----
 
@@ -82,6 +85,7 @@ class PriceTable(BaseModel):
             source=meta.get("source", "unknown"),
             models={k: ModelPrice(**v) for k, v in raw.get("models", {}).items()},
             tools={k: ToolPrice(**v) for k, v in raw.get("tools", {}).items()},
+            infra_usd_per_second=float((raw.get("infra") or {}).get("usd_per_second", 0.0)),
         )
 
     # ---- lookup ----

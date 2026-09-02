@@ -114,7 +114,20 @@ def run(
 
         mutator = LLMMutator(model=llm_model, base_url=llm_base_url, prices=prices)
         console.print(f"[dim]LLM mutator: {llm_model} @ {llm_base_url} (fallback: template)[/dim]")
-    rf = FuzzEngine(tgt, prices=prices, config=cfg, mutator=mutator).run()
+
+    # Use the real exactly-once middleware for the duplicate-effect cross-check when
+    # the sibling library is installed; fall back to the native key-aware checker.
+    from costbomb.meter import CostMeter
+    meter = CostMeter(prices)
+    try:
+        from costbomb.integrations.exactly_once import ExactlyOnceDedupChecker
+
+        meter = CostMeter(prices, dedup_checker=ExactlyOnceDedupChecker())
+        console.print("[dim]exactly-once cross-check: verified via the exactly_once middleware[/dim]")
+    except ImportError:
+        pass
+
+    rf = FuzzEngine(tgt, prices=prices, config=cfg, mutator=mutator, meter=meter).run()
     render_terminal(rf, console=console)
 
     if findings_out:

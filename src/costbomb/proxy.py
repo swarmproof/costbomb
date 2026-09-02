@@ -13,6 +13,7 @@ that decides *dollars* lives here and is unit-tested against recorded payloads.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from costbomb._vendor.trace import Span, Trace
@@ -104,11 +105,13 @@ class ProxyMeter:
         self.meter = CostMeter(prices)
         self._tb: TraceBuilder | None = None
         self._root: Span | None = None
+        self._t0: float = 0.0
         self.calls_recorded = 0
 
     def start_run(self, *, attack_class: str = "") -> None:
         self._tb = TraceBuilder(self.seed, run_id=self.run_id, attack_class=attack_class)
         self._root = self._tb.root()
+        self._t0 = time.perf_counter()  # real wall-clock → infra cost (Delivery 2)
 
     def record(self, response: dict[str, Any] | ModelCall) -> ModelCall:
         """Record one model call into the current run (auto-starts a run if needed)."""
@@ -141,7 +144,7 @@ class ProxyMeter:
         if self._tb is None or self._root is None:
             self.start_run()
         assert self._tb is not None
-        trace = self._tb.build()
+        trace = self._tb.build(duration_s=max(0.0, time.perf_counter() - self._t0))
         self._tb = None
         self._root = None
         return trace

@@ -7,6 +7,7 @@ from costbomb.targets.base import (
     RunRecord,
     Target,
     TargetContext,
+    ToolCall,
     coerce_trace,
 )
 from costbomb.targets.fake import FakeTarget
@@ -27,5 +28,6 @@ __all__ = [
     "RunRecord",
     "Target",
     "TargetContext",
+    "ToolCall",
     "coerce_trace",
 ]

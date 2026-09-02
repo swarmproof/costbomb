@@ -11,7 +11,7 @@ misses entirely (Delivery 1).
 
 from __future__ import annotations
 
-from costbomb.targets import ModelCall, RunRecord
+from costbomb.targets import ModelCall, RunRecord, ToolCall
 
 MODEL = "anthropic:claude-haiku-4-5"  # a cheap model — the tokens are not the danger
 
@@ -32,6 +32,7 @@ def handler(text: str, ctx: object | None = None) -> RunRecord:
 
     context = 400 + len(text) // 4
     calls = [ModelCall(model=MODEL, provider="anthropic", input_tokens=context, output_tokens=40)]
-    # The agent decides to fire a real, side-effecting tool once per reprocess.
-    tool_calls = ["charge_card"] * charges
+    # The bug: it re-charges the SAME refund every reprocess — all calls share one
+    # business key, so exactly-once would collapse them to a single charge.
+    tool_calls = [ToolCall("charge_card", key="charge:order-R100") for _ in range(charges)]
     return RunRecord(calls=calls, tool_calls=tool_calls)
