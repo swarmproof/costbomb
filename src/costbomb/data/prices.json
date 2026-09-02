@@ -43,6 +43,9 @@
     "web_search": { "price_per_call": 0.005 },
     "code_exec": { "price_per_call": 0.0 },
     "premium_api": { "price_per_call": 0.02 },
-    "retrieval": { "price_per_call": 0.001 }
+    "retrieval": { "price_per_call": 0.001 },
+    "charge_card": { "price_per_call": 0.0, "downstream_usd": 50.0, "side_effecting": true },
+    "place_order": { "price_per_call": 0.0, "downstream_usd": 25.0, "side_effecting": true },
+    "send_email": { "price_per_call": 0.0, "downstream_usd": 0.10, "side_effecting": true }
   }
 }

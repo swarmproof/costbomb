@@ -39,6 +39,7 @@ class SearchConfig:
     max_spend_usd: float = 2.0  # NFR-1 — the fuzzer's own hard cap
     budget_usd: float | None = None  # CI --budget threshold (recorded for the gate)
     k: int = 5  # runs per candidate; fitness = p95 over these
+    fitness: str = "total_usd"  # CostBreakdown attr to maximize (or "blast_radius_usd")
     max_generations: int = 200
     plateau_generations: int = 40  # stop after this many with no improvement
     wall_clock_s: float | None = None
@@ -256,6 +257,7 @@ class FuzzEngine:
         samples: list[float] = []
         worst_bd = CostBreakdown()
         worst_trace: Trace | None = None
+        worst_metric = -1.0
         used = 0.0
         # Reserve the larger of the candidate's estimate and the worst real run seen,
         # so the guard is backed by an observed upper bound — a predictor that
@@ -275,10 +277,15 @@ class FuzzEngine:
             )
             trace = self.target.invoke(input, ctx)
             bd = self.meter.cost(trace)
-            samples.append(bd.total_usd)
+            # Fitness is the configured metric (e.g. blast_radius_usd) — but the cap
+            # and own-spend track *direct* total_usd only: the fuzzer really pays the
+            # API bill, never the hypothetical downstream money-at-risk.
+            metric = float(getattr(bd, cfg.fitness, bd.total_usd))
+            samples.append(metric)
             used += bd.total_usd
             self._max_run_cost = max(self._max_run_cost, bd.total_usd)
-            if bd.total_usd >= worst_bd.total_usd:
+            if metric >= worst_metric:
+                worst_metric = metric
                 worst_bd = bd
                 worst_trace = trace
         return _EvalResult(

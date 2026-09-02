@@ -79,6 +79,30 @@ def render_terminal(rf: RunFindings, *, console: Console | None = None) -> None:
 
     console.print(table)
 
+    # Delivery 1: surface the real money at risk when a tool has downstream effects —
+    # the direct bill can be pennies while the blast radius is thousands.
+    worst_blast = max(
+        (f for f in rf.findings if f.breakdown.downstream_usd > 0),
+        key=lambda f: f.breakdown.blast_radius_usd,
+        default=None,
+    )
+    if worst_blast is not None:
+        bd = worst_blast.breakdown
+        console.print(
+            Panel(
+                Text(
+                    f"direct bill {_fmt_usd(bd.total_usd)}  →  blast radius "
+                    f"{_fmt_usd(bd.blast_radius_usd)}  "
+                    f"({_fmt_usd(bd.downstream_usd)} in real side-effects via "
+                    f"{', '.join(bd.side_effecting_tools) or 'tools'})",
+                    style="bold red",
+                ),
+                title="[bold red]⚠ denial-of-wallet blast radius[/bold red]",
+                subtitle=f"{worst_blast.attack_class} · {bd.n_tool_calls} side-effecting calls",
+                border_style="red",
+            )
+        )
+
     if rf.classes_skipped:
         console.print(
             f"[dim]skipped (target can't exhibit): {', '.join(rf.classes_skipped)}[/dim]"

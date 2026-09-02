@@ -65,6 +65,7 @@ Each declares whether it `applies()` to your target, so coverage is honest ("ski
 A **directed greybox fuzzer with a dollar-valued fitness function** (seed → evaluate → select → mutate), with three agent-specific twists:
 
 - **The cost meter is the oracle** — true dollars is a *sum over sources*: model tokens (input/output/reasoning/cache) **+** tool-call fees **+** recursive sub-agent spawn cost. A token-only meter misses exactly where `tool-storm` and `recursion` live.
+- **Blast radius, not just the token bill** — a side-effecting tool (`charge_card`, `place_order`) carries a `downstream_usd` consequence cost in the price table. costbomb reports both the agent's **direct bill** (`total_usd`) and the **blast radius** (`blast_radius_usd` = direct + real money moved), and can *search* for the worst blast radius with `--fitness blast_radius_usd`. On the demo refund agent, a 0.07¢ bill hides an **$1,800** blast radius.
 - **Fitness is p95 over k runs**, not one sample — the target is non-deterministic, so a scalar would make findings and the CI gate flap.
 - **A surrogate estimator pre-ranks candidates** so real dollars are spent only confirming the promising ones — and the whole search runs under a **hard cap on the fuzzer's own spend** (`--max-spend`, default $2). The tool that finds runaway spend must never run away itself.
 
