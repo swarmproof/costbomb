@@ -43,6 +43,8 @@ providers = ["anthropic>=0.40", "openai>=1.40"]
 http = ["httpx>=0.27"]
 # Real exactly-once cross-check for duplicate side-effects (REQ-RP-4).
 exactly-once = ["exactly-once>=0.2"]
+# Validate the downstream/blast-radius slice against Stripe test-mode.
+stripe = ["stripe>=9.0"]
 # OTLP export of findings to any OTel GenAI backend (REQ-RP-5, NFR-9).
 otel = [
     "opentelemetry-api>=1.27",
