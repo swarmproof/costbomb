@@ -148,9 +148,14 @@ product rests on the meter being right, and that claim isn't proven yet.
 | Determinism, gate red/green + price-drift-separation **logic** | Gate non-flakiness at recommended `k` on a **real** non-deterministic target |
 | Side-effect-free default; no-LLM/dry-run mode | Embedded path against a **real** stampede agent (`PersonaTarget` tested with a fake driver); `MockworldTarget` / `LLMMutator` against real backends (stub / mocked) |
 
-Until the real meter-accuracy corpus exists and passes, treat costbomb as a
-well-engineered prototype whose oracle is unproven. See
-[`tests/fixtures/meter/README.md`](./tests/fixtures/meter/README.md) to add real fixtures.
+Reported dollars are a **sum across different billers** (LLM provider, Stripe, cloud),
+so validation is **per slice** — no single invoice proves the whole number. A green run
+proves the *invoice-backed* slices, not the modeled ones. See
+[`docs/VALIDATION.md`](./docs/VALIDATION.md) for the per-slice biller/status table and
+the ready-to-run reconciliation harnesses (`examples/validate_llm_slice.py` runs a
+*full* ReAct agent through the proxy; `examples/validate_stripe_slice.py` reconciles the
+blast radius against Stripe test-mode). Add real fixtures via
+[`tests/fixtures/meter/README.md`](./tests/fixtures/meter/README.md).
 
 ## Design docs
 

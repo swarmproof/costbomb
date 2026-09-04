@@ -125,3 +125,16 @@ def render_terminal(rf: RunFindings, *, console: Console | None = None) -> None:
                 border_style="dim",
             )
         )
+
+    # Honesty: dollar slices are billed by different systems; say which are modeled
+    # (validated against their own biller separately — see docs/VALIDATION.md).
+    modeled = []
+    if any(f.breakdown.downstream_usd > 0 for f in rf.findings):
+        modeled.append("downstream→Stripe")
+    if any(f.breakdown.infra_usd > 0 for f in rf.findings):
+        modeled.append("infra→cloud")
+    if modeled:
+        console.print(
+            f"[dim]note: modeled slices validated against their own biller "
+            f"({', '.join(modeled)}); direct LLM bill via provider invoice. See docs/VALIDATION.md[/dim]"
+        )
