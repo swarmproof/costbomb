@@ -23,7 +23,7 @@ from costbomb.pricing import PriceTable
 from costbomb.targets.base import Target, TargetContext
 from costbomb.targets.fake import FakeTarget
 
-__version__ = "0.2.0.dev0"
+__version__ = "0.2.0"
 
 __all__ = [
     "AttackClass",

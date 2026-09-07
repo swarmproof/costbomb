@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "costbomb"
-version = "0.2.0.dev0"
+version = "0.2.0"
 description = "Denial-of-wallet fuzzing for agent systems — find the inputs that make your agent spend $500 to answer a $0.05 question, and gate CI on spend regressions."
 readme = "README.md"
 requires-python = ">=3.11"
