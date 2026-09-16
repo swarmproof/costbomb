@@ -169,6 +169,8 @@ pytest            # unit → integration → e2e + meter-accuracy corpus, mapped
 ruff check src tests
 ```
 
+Releasing is via PyPI Trusted Publishing — see [`docs/PUBLISHING.md`](./docs/PUBLISHING.md).
+
 ## Part of the Swarm Proof toolkit
 
 *Trust infrastructure for the agent economy — seven projects, one thesis.*
